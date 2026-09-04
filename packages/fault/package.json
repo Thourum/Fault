@@ -1,0 +1,47 @@
+{
+  "name": "@itterno/fault",
+  "version": "0.1.0",
+  "description": "Result types with rich Fault errors built for error tracing. Inspired by neverthrow.",
+  "type": "module",
+  "files": ["dist"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./fetch": { "types": "./dist/fetch.d.ts", "default": "./dist/fetch.js" },
+    "./zod": { "types": "./dist/zod.d.ts", "default": "./dist/zod.js" },
+    "./drizzle": { "types": "./dist/drizzle.d.ts", "default": "./dist/drizzle.js" },
+    "./pg": { "types": "./dist/pg.d.ts", "default": "./dist/pg.js" },
+    "./std": { "types": "./dist/std.d.ts", "default": "./dist/std.js" }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tests/tsconfig.tests.json",
+    "test": "bun test",
+    "check:exports": "attw --pack . --profile esm-only",
+    "local-ci": "bun run typecheck && bun run test && bun run build && bun run check:exports"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "drizzle-orm": ">=0.44.0",
+    "pg": ">=8.0.0",
+    "zod": ">=3.25.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": { "optional": true },
+    "pg": { "optional": true },
+    "zod": { "optional": true }
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "latest",
+    "@types/bun": "latest",
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "@typescript/native-preview": "latest",
+    "drizzle-orm": "^0.44.6",
+    "pg": "^8.16.3",
+    "tsdown": "latest",
+    "typescript": "latest",
+    "zod": "^3.25.76"
+  },
+  "keywords": ["result", "error-handling", "neverthrow", "fault", "typescript"],
+  "license": "MIT"
+}
