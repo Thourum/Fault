@@ -15,7 +15,7 @@
 - Package name `@itterno/fault`, `"type": "module"`, ESM only — no CJS output.
 - Root entry has **zero runtime dependencies**. `dependencies` must be `{}`.
 - `zod`, `drizzle-orm`, `pg` are `peerDependencies` with `peerDependenciesMeta.<name>.optional: true`.
-- Subpath files import core via relative paths (`../index.js`, `../fault.js`), never `@itterno/fault`.
+- Subpath files import core via extensionless relative paths (`../result`, `../fault`), never `@itterno/fault`. `moduleResolution: "Bundler"` makes this legal; tsdown produces the final `.js` graph, bun runs tests from source.
 - Combinator naming: `and*` runs on Ok, `or*` runs on Err. `andTee`→`andInspect`, `orTee`→`orInspect`, `andThrough`→`andCheck`. Old names removed, no aliases.
 - All helpers return `Result<T, Fault>` / `ResultAsync<T, Fault>`.
 - Tests use `bun:test` only (no vitest, no testdouble).
@@ -29,7 +29,8 @@
 | Path | Action | Responsibility |
 |---|---|---|
 | `package.json` | rewrite | exports, peers, scripts |
-| `tsconfig.json` | rewrite | strict, NodeNext |
+| `tsconfig.json` | rewrite | strict, ESNext + Bundler resolution |
+| `.gitignore` | verify | `dist` already listed — no change expected |
 | `tsdown.config.ts` | create | 6 entries, esm, dts |
 | `tests/tsconfig.tests.json` | rewrite | typecheck tests + examples |
 | `src/result.ts` | modify | rename combinators |
@@ -87,9 +88,9 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "drizzle-orm": ">=0.30.0",
+    "drizzle-orm": ">=0.44.0",
     "pg": ">=8.0.0",
-    "zod": ">=3.20.0"
+    "zod": ">=3.25.0"
   },
   "peerDependenciesMeta": {
     "drizzle-orm": { "optional": true },
@@ -106,7 +107,7 @@
     "pg": "^8.16.3",
     "tsdown": "latest",
     "typescript": "latest",
-    "zod": "^3.20.0"
+    "zod": "^3.25.76"
   },
   "keywords": ["result", "error-handling", "neverthrow", "fault", "typescript"],
   "license": "MIT"
@@ -115,14 +116,16 @@
 
 Keep `private: true` out — the acceptance criterion installs the tarball.
 
+Peer ranges are the floors we actually test against: `drizzle-orm >=0.44` (the `DrizzleQueryError` wrapper `/drizzle` unwraps exists there; installed is 0.44.6), `zod >=3.25` (installed 3.25.76), `pg >=8`. Widen later only with a test matrix.
+
 - [ ] **Step 2: Rewrite `tsconfig.json`**
 
 ```json
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM"],
     "types": ["bun-types"],
     "strict": true,
@@ -137,7 +140,7 @@ Keep `private: true` out — the acceptance criterion installs the tarball.
 }
 ```
 
-`DOM` lib is for `fetch`/`Response`/`Headers` types in `/fetch`.
+`DOM` lib is for `fetch`/`Response`/`Headers` types in `/fetch`. `Bundler` resolution keeps the existing extensionless relative imports (`./result`, `../fault`) valid in `src/` and `tests/` — no `.js` sweep needed; tsdown resolves the graph for `dist/`.
 
 - [ ] **Step 3: Create `tsdown.config.ts`**
 
@@ -205,6 +208,8 @@ Expected: all pass. If a `.toHaveBeenCalled*` matcher differs, bun:test supports
 
 Run: `bunx tsgo --noEmit -p tsconfig.json`
 Expected: errors are possible because `strict` is now on and the fork was `strict: false`. Fix each with the narrowest change (add `!`, `as`, or a type annotation). Do not change runtime behaviour. Then run `bunx tsgo --noEmit -p tests/tsconfig.tests.json` and fix likewise (ignore `examples/` errors for now).
+
+**Line anchors in later tasks** (`result.ts:185-219`, `fault.ts:57-76`, …) were taken before these strict fixes. Treat them as approximate — locate by symbol name (`andTee`, `withMetadata`, `FaultTag`), not by number.
 
 - [ ] **Step 10: Commit**
 
@@ -331,8 +336,8 @@ Same three renames at L210–288, including JSDoc. `grep -n "Tee\|Through" src/r
 
 - [ ] **Step 6: Run all tests and typecheck**
 
-Run: `bun test && bunx tsgo --noEmit -p tsconfig.json`
-Expected: PASS, no type errors.
+Run: `bun run typecheck && bun test`
+Expected: PASS, no type errors in either `tsconfig.json` or `tests/tsconfig.tests.json` (the latter covers `typecheck-tests.ts`, where the ~15 `andThrough` sites lived).
 
 - [ ] **Step 7: Commit**
 
@@ -389,8 +394,13 @@ describe('Fault', () => {
     const f = new Fault('x').withCause(cause)
     expect(f.cause).toBe(cause)
   })
-  it('records location from stack', () => {
-    expect(new Fault('x').location).toMatch(/fault\.test\.ts/)
+  it('records a stack location', () => {
+    // The existing filter skips frames containing 'Fault.' but not 'new Fault', so the
+    // first frame may be the constructor itself. Assert shape only, not the file.
+    expect(new Fault('x').location).toMatch(/^at /)
+  })
+  it('withContext merges into metadata (alias of object withMetadata)', () => {
+    expect(new Fault('x').withContext({ a: 1 }).withMetadata({ b: 2 }).metadata).toEqual({ a: 1, b: 2 })
   })
   it('statusCode maps tags', () => {
     const cases: Array<[string, number]> = [
@@ -437,6 +447,8 @@ Expected: FAIL (module import of `zod`/`drizzle-orm` may succeed since devDeps e
 
 - [ ] **Step 3: Edit `src/fault.ts`**
 
+Read `src/fault.ts` fully first. The "unchanged" assertions in Step 1 were checked against the current source: `toJSON` recurses into a `Fault` cause (`causeValue.toJSON()`), `ServiceError` sets `details = description ?? message`, `withDescription(details, message?)` overrides `message`, and `withContext` merges an object into `#metadata`. If any of those has drifted, fix the test to match the source — do not change existing behaviour to match the test.
+
 1. Delete lines 1–4 (imports) and lines 7–8 (`let otel`, `let sentry`).
 2. Delete `static fromZod` (L400–418) and `export function DatabaseError` (L498–543).
 3. Replace `capture()` (L326–378) with:
@@ -469,14 +481,11 @@ Expected: FAIL (module import of `zod`/`drizzle-orm` may succeed since devDeps e
     withMetadata(key: string, value: unknown): this;
     withMetadata(data: Record<string, unknown>): this;
     withMetadata(keyOrData: string | Record<string, unknown>, value?: unknown): this {
-        if (typeof keyOrData === 'string') {
-            this.#metadata = { ...this.#metadata, [keyOrData]: value };
-        } else {
-            this.#metadata = { ...this.#metadata, ...keyOrData };
-        }
-        return this;
+        return this.withContext(typeof keyOrData === 'string' ? { [keyOrData]: value } : keyOrData);
     }
 ```
+
+(`withContext` already does the object merge — reuse it, don't duplicate.)
 
 6. Extend `FaultTag` (L431–448) — add these members before `(string & {})`:
 
@@ -520,7 +529,9 @@ Expected: FAIL (module import of `zod`/`drizzle-orm` may succeed since devDeps e
 
 (`CONFIGURATION_ERROR` and `TRANSACTION_ROLLBACK_ERROR` fall to `default` 500.)
 
-8. Remove the export of `DatabaseError` from `src/index.ts` line 31 (leave the rest; `index.ts` is fully rewritten in Task 10). The `utils/*` files still import `Fault.fromZod` / `DatabaseError` — they break here and are fixed in Tasks 5–8. Run `bun test tests/fault.test.ts` only.
+8. In `src/index.ts`: change the `fault` export line to `export { Fault, ServiceError, type FaultTag } from './fault';` and **delete every `./utils/*` re-export line** (`safeFetch`, `safeZodParse`, `safeDb`, `parsePgError`). Otherwise `bun test` for `index.test.ts` would load `utils/*`, which still reference the removed `Fault.fromZod` / `DatabaseError`, and fail at link time. The utils are re-homed in Tasks 5–8 and `index.ts` is fully rewritten in Task 10. Leave `src/utils/*` on disk, unreferenced, until then.
+
+Run `bun test` (whole suite) — `index.test.ts`, `safe-try.test.ts`, `combinators.test.ts`, `fault.test.ts` must all pass. `bunx tsgo --noEmit` will still report errors inside `src/utils/*` (they import removed symbols); that is expected until Task 8.
 
 - [ ] **Step 4: Run, verify passes**
 
@@ -582,6 +593,8 @@ describe('retry', () => {
     expect(r._unsafeUnwrapErr()).toBe('fatal'); expect(calls).toBe(1)
   })
   it('waits delayMs between attempts', async () => {
+    // bun:test has no fake-timer API; a lower-bound wall-clock check is deterministic enough
+    // (spec §5 says "fake timers" — this is the deliberate substitute).
     const t0 = Date.now()
     await retry(failing(2), { times: 3, delayMs: 30 })
     expect(Date.now() - t0).toBeGreaterThanOrEqual(55)
@@ -601,8 +614,8 @@ Run: `bun test tests/retry.test.ts` → FAIL, cannot find `../src/retry`.
 - [ ] **Step 3: Implement `src/retry.ts`**
 
 ```ts
-import { ResultAsync } from './result-async.js'
-import type { Result } from './result.js'
+import { ResultAsync } from './result-async'
+import type { Result } from './result'
 
 export interface RetryOptions<E> {
     /** Total attempts, including the first. */
@@ -630,7 +643,7 @@ export function retry<T, E>(fn: () => ResultAsync<T, E>, opts: RetryOptions<E>):
 }
 ```
 
-Add `export { retry, type RetryOptions } from './retry.js'` to `src/index.ts`.
+Add `export { retry, type RetryOptions } from './retry'` to `src/index.ts`.
 
 - [ ] **Step 4: Run, verify passes**
 
@@ -700,7 +713,7 @@ Run: `bun test tests/pg.test.ts` → FAIL, cannot find `../src/pg`.
 mkdir -p src/pg && git mv src/utils/pg-error-parser.ts src/pg/index.ts
 ```
 
-In `src/pg/index.ts`: change `import { Fault } from '../fault'` → `import { Fault } from '../fault.js'`. Where the base fault is built (`new Fault(pgError).withMetadata('pgCode', ...)` around old L62), append `.withCause(error)` so the original `DatabaseError` is the cause (the constructor copies `initial.cause`, not `initial`). Keep everything else.
+In `src/pg/index.ts`: change `import { Fault } from '../fault'` → `import { Fault } from '../fault'`. Where the base fault is built (`new Fault(pgError).withMetadata('pgCode', ...)` around old L62), append `.withCause(error)` so the original `DatabaseError` is the cause (the constructor copies `initial.cause`, not `initial`). Keep everything else.
 
 - [ ] **Step 4: Run, verify passes**
 
@@ -777,10 +790,10 @@ mkdir -p src/zod && git mv src/utils/safeZodParse.ts src/zod/index.ts
 Edit `src/zod/index.ts`:
 - Imports become:
   ```ts
-  import { err, ok } from '../result.js'
-  import type { Result } from '../result.js'
+  import { err, ok } from '../result'
+  import type { Result } from '../result'
   import type { z, ZodError, ZodSchema } from 'zod'
-  import { Fault } from '../fault.js'
+  import { Fault } from '../fault'
   ```
 - Add before `safeZodParse`:
   ```ts
@@ -888,9 +901,9 @@ Replace the file body with:
 ```ts
 import { DrizzleError, DrizzleQueryError, TransactionRollbackError } from 'drizzle-orm/errors'
 import { DatabaseError as PgDatabaseError } from 'pg'
-import { ResultAsync } from '../result-async.js'
-import { Fault } from '../fault.js'
-import { parsePgError } from '../pg/index.js'
+import { ResultAsync } from '../result-async'
+import { Fault } from '../fault'
+import { parsePgError } from '../pg/index'
 
 const pgCauseOf = (e: unknown): PgDatabaseError | undefined => {
     const cause = (e as { cause?: unknown } | undefined)?.cause
@@ -975,9 +988,19 @@ describe('safeFetch', () => {
     expect(f.tag).toBe('NETWORK_ERROR')
     expect(f.cause).toBeInstanceOf(TypeError)
   })
-  it('PARSE_ERROR when 2xx body is not JSON', async () => {
-    stub(200, 'not json', { 'content-type': 'text/plain' })
-    expect((await safeFetch('http://x'))._unsafeUnwrapErr().tag).toBe('PARSE_ERROR')
+  it('PARSE_ERROR when 2xx JSON body is malformed', async () => {
+    stub(200, '{not json')
+    const f = (await safeFetch('http://x'))._unsafeUnwrapErr()
+    expect(f.tag).toBe('PARSE_ERROR')
+    expect(f.cause).toBeInstanceOf(SyntaxError)
+  })
+  it.each([
+    ['204', 204, '', { 'content-type': 'application/json' }],
+    ['empty body', 200, '', { 'content-type': 'application/json' }],
+    ['non-JSON content-type', 200, 'ok', { 'content-type': 'text/plain' }],
+  ])('Ok(undefined) on 2xx with %s', async (_, status, body, headers) => {
+    stub(status, body, headers)
+    expect((await safeFetch('http://x'))._unsafeUnwrap()).toBeUndefined()
   })
   it('error body that is not JSON is kept as text', async () => {
     stub(500, 'oops', { 'content-type': 'text/plain' })
@@ -997,7 +1020,7 @@ mkdir -p src/fetch && git mv src/utils/safeFetch.ts src/fetch/index.ts
 ```
 
 Edit `src/fetch/index.ts`:
-- Imports: `import { errAsync, ResultAsync } from '../result-async.js'`, `import { Fault, type FaultTag } from '../fault.js'`.
+- Imports: `import { errAsync, ResultAsync } from '../result-async'`, `import { Fault, type FaultTag } from '../fault'`.
 - Replace the status→tag block (old L143–151) with:
 
 ```ts
@@ -1015,7 +1038,7 @@ const tagForStatus = (status: number): FaultTag => {
 (hoist it to module scope; call `tagForStatus(response.status)` where `tag` was computed).
 - In the network-error mapper, chain `.withCause(err)` onto the Fault.
 - In the error-response branch: read body as text, try `JSON.parse`, on failure keep the raw text as `httpBody`.
-- In the parse-error branch, chain `.withCause(err)`.
+- In the success branch (spec §4 body handling): before calling `response.json()`, return `okAsync(undefined as T)` when `response.status === 204`, or the `content-type` header does not include `application/json`, or the body text is empty. Concretely: `const text = await response.text(); if (status === 204 || !isJson || text === '') return ok(undefined as T)`, then `JSON.parse(text)` inside `fromThrowable`/try — a `SyntaxError` → `PARSE_ERROR` with `.withCause(err)`. Reading `text()` first (not `json()`) is what lets both the empty check and the cause work.
 
 - [ ] **Step 4: Run, verify passes**
 
@@ -1093,6 +1116,10 @@ describe('fs helpers', () => {
   it('INTERNAL_ERROR on other errors (EISDIR)', async () => {
     expect((await safeReadFile(dir))._unsafeUnwrapErr().tag).toBe('INTERNAL_ERROR')
   })
+  it('safeWriteFile NOT_FOUND when parent dir is missing', async () => {
+    const f = (await safeWriteFile(join(dir, 'nope', 'x.txt'), 'hi'))._unsafeUnwrapErr()
+    expect(f.tag).toBe('NOT_FOUND'); expect(f.metadata.code).toBe('ENOENT')
+  })
   it('cleanup', () => rmSync(dir, { recursive: true, force: true }))
 })
 
@@ -1121,9 +1148,9 @@ Run: `bun test tests/std.test.ts` → FAIL.
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises'
-import { Result, ok, err } from '../result.js'
-import { ResultAsync } from '../result-async.js'
-import { Fault, type FaultTag } from '../fault.js'
+import { Result, ok, err } from '../result'
+import { ResultAsync } from '../result-async'
+import { Fault, type FaultTag } from '../fault'
 
 const parseFault = (e: unknown, what: string) =>
     new Fault(e instanceof Error ? e : String(e)).withTag('PARSE_ERROR').withDetails(what).withCause(e)
@@ -1193,18 +1220,18 @@ git commit -m "feat: add /std subpath — safe JSON, fs, env helpers"
 - Modify: `packages/fault/CLAUDE.md`
 
 **Interfaces:**
-- Produces: `@itterno/fault` root exports exactly: everything currently re-exported from `./result.js` and `./result-async.js`, plus `Fault`, `ServiceError`, `type FaultTag`, `retry`, `type RetryOptions`. No integration exports.
+- Produces: `@itterno/fault` root exports exactly: everything currently re-exported from `./result` and `./result-async`, plus `Fault`, `ServiceError`, `type FaultTag`, `retry`, `type RetryOptions`. No integration exports.
 
 - [ ] **Step 1: Rewrite `src/index.ts`**
 
-Keep the existing `result` / `result-async` export lines (L20–28). Replace everything from L31 down with:
+After Task 3 Step 8 the file is the header comment + `result` / `result-async` export blocks + one `fault` export line. Make the tail exactly:
 
 ```ts
-export { Fault, ServiceError, type FaultTag } from './fault.js'
-export { retry, type RetryOptions } from './retry.js'
+export { Fault, ServiceError, type FaultTag } from './fault'
+export { retry, type RetryOptions } from './retry'
 ```
 
-Ensure all relative imports in `src/**` use `.js` extensions (NodeNext requires it): `grep -rn "from '\./\|from '\.\./" src | grep -v "\.js'"` → fix any hits.
+Then `grep -rn "utils/" src` → must return nothing.
 
 - [ ] **Step 2: Remove `src/utils`**
 
@@ -1264,7 +1291,7 @@ git add -A packages/fault/src packages/fault/CLAUDE.md packages/fault/.gitignore
 git commit -m "feat: core-only root entry, subpath build, exports verified"
 ```
 
-(Make sure `dist/` is in `.gitignore`; add it if not.)
+(`dist` and `*.tgz` are already in `packages/fault/.gitignore` — verify with `git status` that neither shows up; the `git add` of `.gitignore` above is a no-op unless you had to touch it.)
 
 ---
 
@@ -1341,7 +1368,7 @@ export const users = pgTable('users', {
 const db = drizzle(process.env.DATABASE_URL ?? '', { schema: { users } })
 ```
 
-Then the spec's imports and `chargeUser` body unchanged. Remove `errAsync` from the import if unused.
+Then the spec's `@itterno/fault*` imports and `chargeUser` body unchanged, with two edits: **drop the spec's `import * as Sentry from "@sentry/node"` line** (it would clash with the `declare const Sentry` stub and pull an uninstalled package), and keep the `retry` predicate as `f.tag === "CONNECTION_ERROR"` (spec §7.1 already says so).
 
 - [ ] **Step 4: Create `examples/createPost.ts`**
 
@@ -1457,4 +1484,5 @@ git commit -m "docs: README, examples for payment and post creation flows"
 
 - **Spec coverage:** §1 layout → T1, T5–T10. §2 core → T3. §2b renames → T2; `retry` → T4. §3 tooling → T1, T10. §4 fetch/zod/pg/drizzle/std → T8/T6/T5/T7/T9. §5 tests → each task + `combinators.test.ts` (T2), `retry.test.ts` (T4). §6 docs → T10 (CLAUDE.md), T11. §7 examples → T11. Acceptance → T10 steps 4–7, T11 step 8, T2 grep.
 - **Type consistency:** `withMetadata(object)` overload defined T3, used T6/T9/T11. `withCause` defined T3, used T5–T9. `tagForStatus` local to T8. `FaultTag` additions in T3 cover every tag used in T5 (`UNIQUE_CONSTRAINT_ERROR`, `FOREIGN_KEY_ERROR`, `CONNECTION_ERROR`, `TRANSACTION_ROLLBACK_ERROR`), T8 (`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMITED`), T9 (`CONFIGURATION_ERROR`), T11 (`CONFLICT`, `PAYMENT_FAILED`, `EXTERNAL_ERROR`). Spec example uses `withMetadata({ intentId })` object form — supported.
-- **Known deviation from spec:** spec's example `retry` predicate checks `f.tag === "DATABASE_ERROR"` for "connection-ish" failures; with the pg parser the connection tag is `CONNECTION_ERROR`. T11 may adjust the example predicate to `f.tag === 'CONNECTION_ERROR' || f.tag === 'DATABASE_ERROR'` — note it in the commit.
+- **Deliberate deviations from spec:** (1) `retry.test.ts` uses a wall-clock lower bound instead of fake timers — `bun:test` has none. (2) Spec §3 says `module: NodeNext`; plan uses `ESNext` + `moduleResolution: Bundler` so the existing extensionless imports stay valid and no `.js` sweep is needed. Both are noted inline where they apply.
+- **Review fixes applied (2026-09-04):** Bundler resolution instead of a `.js` sweep; `index.ts` utils re-exports stripped in T3 Step 8 so the suite links during T3–T9; line anchors flagged approximate after T1 strict fixes; `Fault` "unchanged" assertions verified against source and `location` test loosened; `withMetadata(object)` delegates to existing `withContext` (+ test); T8 implements and tests spec's 204/empty/non-JSON → `Ok(undefined)`; `safeWriteFile` failure tested; peer ranges pinned to tested floors; `.gitignore` already covers `dist`; T11 drops the `@sentry/node` import and uses `CONNECTION_ERROR`.

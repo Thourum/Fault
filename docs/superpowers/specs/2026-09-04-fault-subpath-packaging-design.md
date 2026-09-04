@@ -64,7 +64,7 @@ src/
 ```
 
 `src/utils/` is removed; each file moves into its subpath dir. Subpaths import
-core via `../index.js` (relative), never via the package name.
+core via relative paths (`../result`, `../fault`), never via the package name.
 
 `package.json`:
 
@@ -138,7 +138,7 @@ Added to core (zero deps):
 | Exports    | `@arethetypeswrong/cli`                | `check:exports: attw --pack`                  |
 | CI local   |                                        | `local-ci: bun run typecheck && bun run test && bun run build && bun run check:exports` |
 
-`tsdown.config.ts`: `entry: { index, fetch, zod, drizzle, pg, std }`, `format: ['esm']`, `dts: true`, `platform: 'node'`, `external` = peer deps. `tsconfig.json`: `strict: true`, `target: ES2022`, `module: NodeNext`, `moduleResolution: NodeNext`.
+`tsdown.config.ts`: `entry: { index, fetch, zod, drizzle, pg, std }`, `format: ['esm']`, `dts: true`, `platform: 'node'`, `external` = peer deps. `tsconfig.json`: `strict: true`, `target: ES2022`, `module: ESNext`, `moduleResolution: Bundler` (extensionless relative imports; tsdown emits the resolved graph).
 
 Existing neverthrow tests (`index.test.ts`, `safe-try.test.ts`) are ported from `vitest`/`testdouble` to `bun:test` (`mock()`); `typecheck-tests.ts` stays as a `--noEmit` target. `bun.lock` regenerated from the new `package.json`.
 
@@ -192,7 +192,7 @@ Unchanged; `DatabaseError` moved here from `fault.ts`.
 ## 5. Tests (all `bun test`, in `tests/`)
 
 - `fault.test.ts`: constructor, every `with*` (incl. `withCause`), getters, `statusCode` map, `toJSON` with nested Fault cause, `location` extraction, `onCapture` hook, `from`, `ServiceError`.
-- `retry.test.ts`: succeeds first try, succeeds on nth, exhausts and returns last Err, `when` predicate stops early, `delayMs` honoured (fake timers).
+- `retry.test.ts`: succeeds first try, succeeds on nth, exhausts and returns last Err, `when` predicate stops early, `delayMs` honoured (wall-clock lower bound; `bun:test` has no fake timers).
 - `combinators.test.ts`: `andInspect` / `orInspect` / `andCheck` on `Result` and `ResultAsync` — pass-through of value, swallowing of thrown side-effect errors, `andCheck` propagating Err.
 - `fetch.test.ts`: mock global `fetch`; one case per row of the tag table plus success and non-JSON body.
 - `zod.test.ts`: curried + direct forms, success, failure shape, `fromZodError`.
