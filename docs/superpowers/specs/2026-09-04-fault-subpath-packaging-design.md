@@ -43,7 +43,7 @@ One package, `packages/fault`, no workspace. Subpath exports:
 
 | Import                    | Exports                                                                        | Peer deps (optional)      |
 |---------------------------|--------------------------------------------------------------------------------|---------------------------|
-| `@itterno/fault`          | everything from neverthrow fork (`Result`, `ResultAsync`, `ok`, `err`, `okAsync`, `errAsync`, `fromThrowable`, `fromPromise`, `fromSafePromise`, `fromAsyncThrowable`, `safeTry`, combine helpers) + `Fault`, `FaultTag`, `ServiceError` | none                      |
+| `@itterno/fault`          | neverthrow fork with the §2b renames (`Result`, `ResultAsync`, `ok`, `err`, `okAsync`, `errAsync`, `fromThrowable`, `fromPromise`, `fromSafePromise`, `fromAsyncThrowable`, `safeTry`, combine helpers) + `Fault`, `FaultTag`, `ServiceError`, `retry` | none                      |
 | `@itterno/fault/fetch`    | `safeFetch`                                                                    | none (global `fetch`)     |
 | `@itterno/fault/zod`      | `safeZodParse`, `fromZodError`                                                 | `zod`                     |
 | `@itterno/fault/drizzle`  | `safeDb`, `DatabaseError`                                                      | `drizzle-orm`, `pg`       |
@@ -87,7 +87,10 @@ core via `../index.js` (relative), never via the package name.
   ```
 
   Users wire OTel/Sentry themselves. Auto-detect via `await import()` is a later phase if wanted.
-- Everything else (`#tag`, `#details`, `#location`, `#metadata`, `cause`, `with*` chain, getters, `statusCode` map, `toJSON`, `static from`, `FaultTag`, `ServiceError`) unchanged.
+- Add `withCause(cause: unknown): this` and an object overload `withMetadata(data: Record<string, unknown>): this`.
+- `with*` methods **mutate and return `this`** (as today). So `.orInspect((f) => f.withMetadata({...}).capture())` enriches the same Fault the caller receives.
+- `FaultTag` gains: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `RATE_LIMITED`, `PAYMENT_FAILED`, `EXTERNAL_ERROR`, `CONFIGURATION_ERROR`, plus the tags `/pg` already emits (`UNIQUE_CONSTRAINT_ERROR`, `FOREIGN_KEY_ERROR`, `CONNECTION_ERROR`, `TRANSACTION_ROLLBACK_ERROR`). `statusCode` maps them: 400 BAD_REQUEST/FOREIGN_KEY_ERROR, 401 UNAUTHORIZED, 402 PAYMENT_FAILED, 403 FORBIDDEN, 409 CONFLICT/UNIQUE_CONSTRAINT_ERROR, 429 RATE_LIMITED, 502 EXTERNAL_ERROR, 503 CONNECTION_ERROR, else 500.
+- Everything else (`#tag`, `#details`, `#location`, `#metadata`, `cause`, getters, `toJSON`, `static from`, `ServiceError`) unchanged.
 
 ## 2b. Combinator renames (`Result` / `ResultAsync`)
 
@@ -109,15 +112,21 @@ the suffix says what happens to the value.
 | `_unsafeUnwrap`  | `_unsafeUnwrap`   | unchanged                                                        |
 | `asyncAndThen` … | `asyncAndThen` …  | unchanged                                                        |
 
-Old names are removed, not aliased — the package is v0.1 and private. The
+Old names are removed, not aliased — v0.1, no external consumers yet. The
 forked tests are renamed accordingly. `typecheck-tests.ts` updated.
+
+`andInspect`/`orInspect` swallow exceptions thrown by `f` (neverthrow
+behaviour, kept): a side effect must never turn an Ok into an Err or replace
+the original Err. Consequence: a throwing `onCapture` hook is dropped
+silently — wrap your hook in its own try/catch + fallback logger if that
+matters.
 
 Added to core (zero deps):
 
 - `retry<T, E>(fn: () => ResultAsync<T, E>, opts: { times: number; delayMs?: number; when?: (e: E) => boolean }): ResultAsync<T, E>` —
-  re-runs `fn` while it returns Err and `when(e)` is true (default: always),
-  up to `times`; resolves with the last Err. Fixed delay; backoff is a later
-  phase.
+  `times` is the **total number of attempts** (`times: 3` = at most 3 calls
+  to `fn`). Re-runs while `fn` returns Err and `when(e)` is true (default:
+  always); resolves with the last Err. Fixed delay; backoff is a later phase.
 
 ## 3. Tooling
 
@@ -150,9 +159,11 @@ Fix the current tag mapping (all 4xx → `VALIDATION_ERROR` is wrong):
 | 429                        | `RATE_LIMITED`      |
 | other 4xx                  | `BAD_REQUEST`       |
 | 5xx                        | `INTERNAL_ERROR`    |
-| body not JSON              | `PARSE_ERROR`       |
+| 2xx, non-empty body not JSON | `PARSE_ERROR`     |
 
-Metadata: `httpStatus`, `httpStatusText`, `httpHeaders`, `httpBody` (as now). `T` stays an unchecked cast; pair with `/zod` or `/schema` for validation (the example already does this). Add any tags missing from `FaultTag`.
+Body handling on 2xx: `204`, or empty body, or no `content-type: application/json` → resolves `Ok(undefined as T)`. Otherwise `response.json()`; failure → `PARSE_ERROR`. This is what makes fire-and-forget webhook calls (§7.2) work. On 4xx/5xx the body is read as text and JSON-parsed if possible; either form lands in `metadata.httpBody`.
+
+Metadata: `httpStatus`, `httpStatusText`, `httpHeaders`, `httpBody`. `T` stays an unchecked cast; pair with `/zod` for validation (the example does this). Network-error and parse-error Faults carry the thrown error as `cause`.
 
 ### `/zod` — `safeZodParse(schema)(data)` / `safeZodParse(schema, data)`, `fromZodError(err)`
 
@@ -160,7 +171,7 @@ Unchanged semantics; `fromZodError` is the old `Fault.fromZod` (tag `VALIDATION_
 
 ### `/pg` — `parsePgError(error: pg.DatabaseError): Fault`
 
-Unchanged SQLSTATE mapping. Type-only import of `pg`.
+Unchanged SQLSTATE mapping — connection failures (class `08xxx`, `ECONNREFUSED`, …) → `CONNECTION_ERROR`; unique/FK violations → `UNIQUE_CONSTRAINT_ERROR`/`FOREIGN_KEY_ERROR`; serialization/deadlock → `TRANSACTION_ROLLBACK_ERROR`; not-null/check → `VALIDATION_ERROR`; everything else → `DATABASE_ERROR`. So "retry connection-ish failures" means `tag === 'CONNECTION_ERROR'`. The original pg error is attached as `cause`. Type-only import of `pg`.
 
 ### `/drizzle` — `safeDb<T>(promise)`, `DatabaseError(cause)`
 
@@ -201,13 +212,16 @@ Unchanged; `DatabaseError` moved here from `fault.ts`.
 
 These are the target developer experience and become `examples/payment.ts`
 and `examples/createPost.ts`. They must typecheck against the finished
-package (imports use the package name via a tsconfig path alias). Anything
+package (imports use the package name via a tsconfig path alias). The
+snippets below omit app scaffolding — `z` import, drizzle `db`/`users`/`posts`
+table definitions, and `declare const` stubs for `logger`, `stripeKey`, `s3`,
+`bucket`, `webhookUrl`, `hash` — the example files add those. Anything else
 they need that this spec doesn't define is a spec bug.
 
 ### 7.1 Charge a user
 
 ```ts
-import { ok, err, errAsync, retry, Fault, ServiceError } from "@itterno/fault"
+import { ok, err, retry, Fault, ServiceError } from "@itterno/fault"
 import { safeDb } from "@itterno/fault/drizzle"
 import { safeFetch } from "@itterno/fault/fetch"
 import { safeZodParse } from "@itterno/fault/zod"
@@ -220,7 +234,7 @@ const paymentIntentSchema = z.object({ id: z.string(), status: z.enum(["succeede
 export function chargeUser(userId: string, amountCents: number) {
   return retry(
     () => safeDb(db.query.users.findFirst({ where: eq(users.id, userId) })),
-    { times: 3, delayMs: 200, when: (f) => f.tag === "DATABASE_ERROR" },     // only retry connection-ish failures
+    { times: 3, delayMs: 200, when: (f) => f.tag === "CONNECTION_ERROR" },   // never retry constraint/logic failures
   )
     .andThen((user) => (user ? ok(user) : err(ServiceError("NOT_FOUND", `user ${userId} not found`))))
     .andThen((user) => (user.paidAt ? err(ServiceError("CONFLICT", "already paid")) : ok(user)))
@@ -254,23 +268,26 @@ location, cause, metadata.
 ### 7.2 Create a post with an image and notify a webhook
 
 ```ts
-import { ok, err, errAsync, retry, fromPromise, ServiceError } from "@itterno/fault"
+import { retry, fromPromise, ServiceError } from "@itterno/fault"
 import { safeDb } from "@itterno/fault/drizzle"
 import { safeFetch } from "@itterno/fault/fetch"
 import { safeZodParse } from "@itterno/fault/zod"
 
 const postInput = z.object({ text: z.string().min(1).max(5000), file: z.instanceof(File) })
 
-const uploadToS3 = (file: File) =>
-  fromPromise(
-    s3.send(new PutObjectCommand({ Bucket: bucket, Key: crypto.randomUUID(), Body: file.stream() })),
+const uploadToS3 = (file: File) => {
+  const key = crypto.randomUUID()
+  return fromPromise(
+    s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: file.stream() })),
     (e) => ServiceError("EXTERNAL_ERROR", "s3 upload failed").withCause(e),
-  ).map((out) => out.$metadata.requestId!)   // or the key — whatever the app stores
+  )
+    .orInspect((f) => logger.warn("upload failed", { tag: f.tag }))   // only S3 failures reach this
+    .map(() => key)
+}
 
 export function createPost(authorId: string, raw: unknown) {
   return safeZodParse(postInput, raw)
     .asyncAndThen(({ text, file }) => uploadToS3(file).map((imageKey) => ({ text, imageKey })))
-    .orInspect((f) => logger.warn("upload failed", { tag: f.tag, authorId: hash(authorId) }))
     .andThen(({ text, imageKey }) =>
       safeDb(db.insert(posts).values({ authorId, text, imageKey }).returning()).map((rows) => rows[0]!),
     )
@@ -285,11 +302,11 @@ export function createPost(authorId: string, raw: unknown) {
 ```
 
 What this shows: `fromPromise` with a `Fault`-producing error mapper for an
-SDK we don't wrap, `asyncAndThen` to cross from `Result` into `ResultAsync`,
+SDK we don't wrap, `orInspect` scoped inside the helper so it only sees S3
+failures, `asyncAndThen` to cross from `Result` into `ResultAsync`,
 `andCheck` for a side call whose failure should fail the chain but whose value
-is discarded, `retry` on a webhook with a tag predicate. Requires
-`Fault.withCause(e: unknown): this` — add it if `fault.ts` doesn't already
-expose one.
+is discarded (the webhook's `204`/empty body resolves Ok per §4), `retry` on
+a webhook with a tag predicate.
 
 ## Acceptance
 
