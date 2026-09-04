@@ -3,6 +3,23 @@
 Date: 2026-09-04
 Status: approved in chat, pending spec review
 
+## Positioning
+
+`@itterno/fault` is inspired by neverthrow (and Rust's `Result`, a little
+effect-ts) but differs in two ways:
+
+1. **Errors are `Fault`s, not `unknown`.** Every helper returns
+   `Result<T, Fault>`; a `Fault` carries tag, details, capture location,
+   metadata and the native `cause` chain, and serialises via `toJSON()`.
+2. **Built for tracing.** `Fault` is designed to be handed to Sentry, OTel or
+   any similar tool with full context intact — `capture()` routes through one
+   `Fault.onCapture` hook, `location` is recorded at construction, causes nest.
+   The point is that a failure deep in a chain reaches your error tracker with
+   *where*, *why* and *what data* — not just a message.
+
+Integrations (`/fetch`, `/zod`, `/drizzle`, …) exist so the common failure
+points of popular libraries become typed `Fault`s instead of thrown surprises.
+
 ## Goal
 
 `@itterno/fault` is a neverthrow-style `Result`/`ResultAsync` library plus a
@@ -72,6 +89,36 @@ core via `../index.js` (relative), never via the package name.
   Users wire OTel/Sentry themselves. Auto-detect via `await import()` is a later phase if wanted.
 - Everything else (`#tag`, `#details`, `#location`, `#metadata`, `cause`, `with*` chain, getters, `statusCode` map, `toJSON`, `static from`, `FaultTag`, `ServiceError`) unchanged.
 
+## 2b. Combinator renames (`Result` / `ResultAsync`)
+
+neverthrow's `andTee` / `orTee` / `andThrough` are hard to read. Rule for
+this library: **`and*` runs on the Ok path, `or*` runs on the Err path**;
+the suffix says what happens to the value.
+
+| neverthrow       | fault             | Behaviour                                                        |
+|------------------|-------------------|------------------------------------------------------------------|
+| `map`            | `map`             | Ok → transform value                                             |
+| `mapErr`         | `mapErr`          | Err → transform error                                            |
+| `andThen`        | `andThen`         | Ok → chain another Result                                        |
+| `orElse`         | `orElse`          | Err → recover with another Result                                |
+| `andTee`         | `andInspect`      | Ok → side effect, value passes through, thrown errors swallowed  |
+| `orTee`          | `orInspect`       | Err → side effect, error passes through, thrown errors swallowed |
+| `andThrough`     | `andCheck`        | Ok → run a Result; if it's Err, fail with that Err; else keep original value |
+| `unwrapOr`       | `unwrapOr`        | unchanged                                                        |
+| `match`          | `match`           | unchanged                                                        |
+| `_unsafeUnwrap`  | `_unsafeUnwrap`   | unchanged                                                        |
+| `asyncAndThen` … | `asyncAndThen` …  | unchanged                                                        |
+
+Old names are removed, not aliased — the package is v0.1 and private. The
+forked tests are renamed accordingly. `typecheck-tests.ts` updated.
+
+Added to core (zero deps):
+
+- `retry<T, E>(fn: () => ResultAsync<T, E>, opts: { times: number; delayMs?: number; when?: (e: E) => boolean }): ResultAsync<T, E>` —
+  re-runs `fn` while it returns Err and `when(e)` is true (default: always),
+  up to `times`; resolves with the last Err. Fixed delay; backoff is a later
+  phase.
+
 ## 3. Tooling
 
 | Concern    | Tool                                   | Script                                        |
@@ -133,7 +180,9 @@ Unchanged; `DatabaseError` moved here from `fault.ts`.
 
 ## 5. Tests (all `bun test`, in `tests/`)
 
-- `fault.test.ts`: constructor, every `with*`, getters, `statusCode` map, `toJSON` with nested Fault cause, `location` extraction, `onCapture` hook, `from`, `ServiceError`.
+- `fault.test.ts`: constructor, every `with*` (incl. `withCause`), getters, `statusCode` map, `toJSON` with nested Fault cause, `location` extraction, `onCapture` hook, `from`, `ServiceError`.
+- `retry.test.ts`: succeeds first try, succeeds on nth, exhausts and returns last Err, `when` predicate stops early, `delayMs` honoured (fake timers).
+- `combinators.test.ts`: `andInspect` / `orInspect` / `andCheck` on `Result` and `ResultAsync` — pass-through of value, swallowing of thrown side-effect errors, `andCheck` propagating Err.
 - `fetch.test.ts`: mock global `fetch`; one case per row of the tag table plus success and non-JSON body.
 - `zod.test.ts`: curried + direct forms, success, failure shape, `fromZodError`.
 - `pg.test.ts`: one case per SQLSTATE branch incl. unique-violation field extraction, fallback.
@@ -148,6 +197,100 @@ Unchanged; `DatabaseError` moved here from `fault.ts`.
 - `examples/safeFetchExample.ts`: import from `@itterno/fault/fetch` and `@itterno/fault/zod`.
 - `CLAUDE.md`: keep bun conventions; drop the `Bun.sql` over `pg` line (contradicts `/pg`).
 
+## 7. Usage examples
+
+These are the target developer experience and become `examples/payment.ts`
+and `examples/createPost.ts`. They must typecheck against the finished
+package (imports use the package name via a tsconfig path alias). Anything
+they need that this spec doesn't define is a spec bug.
+
+### 7.1 Charge a user
+
+```ts
+import { ok, err, errAsync, retry, Fault, ServiceError } from "@itterno/fault"
+import { safeDb } from "@itterno/fault/drizzle"
+import { safeFetch } from "@itterno/fault/fetch"
+import { safeZodParse } from "@itterno/fault/zod"
+import * as Sentry from "@sentry/node"
+
+Fault.onCapture = (fault) => Sentry.captureException(fault, { extra: fault.toJSON() })
+
+const paymentIntentSchema = z.object({ id: z.string(), status: z.enum(["succeeded", "requires_action", "failed"]) })
+
+export function chargeUser(userId: string, amountCents: number) {
+  return retry(
+    () => safeDb(db.query.users.findFirst({ where: eq(users.id, userId) })),
+    { times: 3, delayMs: 200, when: (f) => f.tag === "DATABASE_ERROR" },     // only retry connection-ish failures
+  )
+    .andThen((user) => (user ? ok(user) : err(ServiceError("NOT_FOUND", `user ${userId} not found`))))
+    .andThen((user) => (user.paidAt ? err(ServiceError("CONFLICT", "already paid")) : ok(user)))
+    .andThen((user) =>
+      safeFetch("https://api.stripe.com/v1/payment_intents", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${stripeKey}` },
+        body: new URLSearchParams({ amount: String(amountCents), currency: "eur", customer: user.stripeId }),
+      })
+        .andThen(safeZodParse(paymentIntentSchema))
+        .map((intent) => ({ user, intent })),
+    )
+    .andThen(({ user, intent }) =>
+      intent.status === "failed"
+        ? err(ServiceError("PAYMENT_FAILED", "stripe declined").withMetadata({ intentId: intent.id }))
+        : ok({ user, intent }),
+    )
+    .andInspect(({ user, intent }) =>
+      logger.info("payment ok", { userId: hash(user.id), intent: intent.id, amountCents }),
+    )
+    .orInspect((fault) => fault.withMetadata({ userId: hash(userId), amountCents }).capture())
+}
+```
+
+What this shows: retry with a predicate, turning `null` into a typed
+`NOT_FOUND`, business rules as `err`, `safeFetch` → `safeZodParse` composition,
+`andInspect` for success logging with anonymised data, `orInspect` as the one
+place every failure is captured — no try/catch, and the error tracker gets tag,
+location, cause, metadata.
+
+### 7.2 Create a post with an image and notify a webhook
+
+```ts
+import { ok, err, errAsync, retry, fromPromise, ServiceError } from "@itterno/fault"
+import { safeDb } from "@itterno/fault/drizzle"
+import { safeFetch } from "@itterno/fault/fetch"
+import { safeZodParse } from "@itterno/fault/zod"
+
+const postInput = z.object({ text: z.string().min(1).max(5000), file: z.instanceof(File) })
+
+const uploadToS3 = (file: File) =>
+  fromPromise(
+    s3.send(new PutObjectCommand({ Bucket: bucket, Key: crypto.randomUUID(), Body: file.stream() })),
+    (e) => ServiceError("EXTERNAL_ERROR", "s3 upload failed").withCause(e),
+  ).map((out) => out.$metadata.requestId!)   // or the key — whatever the app stores
+
+export function createPost(authorId: string, raw: unknown) {
+  return safeZodParse(postInput, raw)
+    .asyncAndThen(({ text, file }) => uploadToS3(file).map((imageKey) => ({ text, imageKey })))
+    .orInspect((f) => logger.warn("upload failed", { tag: f.tag, authorId: hash(authorId) }))
+    .andThen(({ text, imageKey }) =>
+      safeDb(db.insert(posts).values({ authorId, text, imageKey }).returning()).map((rows) => rows[0]!),
+    )
+    .andCheck((post) =>
+      retry(
+        () => safeFetch(webhookUrl, { method: "POST", body: JSON.stringify({ event: "post.created", id: post.id }) }),
+        { times: 5, delayMs: 500, when: (f) => f.tag === "NETWORK_ERROR" || f.tag === "INTERNAL_ERROR" },
+      ),
+    )
+    .orInspect((fault) => fault.withMetadata({ authorId: hash(authorId) }).capture())
+}
+```
+
+What this shows: `fromPromise` with a `Fault`-producing error mapper for an
+SDK we don't wrap, `asyncAndThen` to cross from `Result` into `ResultAsync`,
+`andCheck` for a side call whose failure should fail the chain but whose value
+is discarded, `retry` on a webhook with a tag predicate. Requires
+`Fault.withCause(e: unknown): this` — add it if `fault.ts` doesn't already
+expose one.
+
 ## Acceptance
 
-`bun run local-ci` is green: typecheck (src + type tests), all tests, build emits 6 `.js` + 6 `.d.ts`, `attw --pack` reports no problems. Installing the tarball in a fresh project with no `zod`/`drizzle-orm`/`pg` and importing `@itterno/fault` and `@itterno/fault/fetch` works.
+`bun run local-ci` is green: typecheck (src + type tests + `examples/*.ts`), all tests, build emits 6 `.js` + 6 `.d.ts`, `attw --pack` reports no problems. Installing the tarball in a fresh project with no `zod`/`drizzle-orm`/`pg` and importing `@itterno/fault` and `@itterno/fault/fetch` works. `andTee`/`orTee`/`andThrough` no longer appear anywhere in `src/`.
