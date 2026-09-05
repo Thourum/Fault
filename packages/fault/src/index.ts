@@ -28,12 +28,4 @@ export {
 } from './result-async';
 
 // Export Fault and related utilities
-export { Fault, ServiceError, DatabaseError, type FaultTag } from './fault';
-
-// Export safe utility functions
-export { safeFetch } from './utils/safeFetch';
-export { safeZodParse } from './utils/safeZodParse';
-export { safeDb } from './utils/safeDrizzle';
-
-// Export error parsing utilities
-export { parsePgError } from './utils/pg-error-parser';
+export { Fault, ServiceError, type FaultTag } from './fault';

@@ -1,12 +1,3 @@
-import { z } from 'zod';
-import { parsePgError } from './utils/pg-error-parser';
-import { DrizzleError, DrizzleQueryError, TransactionRollbackError } from 'drizzle-orm/errors';
-import { DatabaseError as PgDatabaseError } from 'pg';
-
-// Optional lazy-loaded observability integrations
-let otel: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-let sentry: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-
 /**
  * Fault is an error handling class providing rich context preservation
  * and safe error reporting in applications. It combines debugging
@@ -134,15 +125,29 @@ export class Fault extends Error {
     get statusCode(): number {
         switch (this.#tag) {
             case 'VALIDATION_ERROR':
+            case 'BAD_REQUEST':
+            case 'FOREIGN_KEY_ERROR':
                 return 400;
             case 'AUTHENTICATION_ERROR':
+            case 'UNAUTHORIZED':
                 return 401;
+            case 'PAYMENT_FAILED':
+                return 402;
             case 'AUTHORIZATION_ERROR':
+            case 'FORBIDDEN':
                 return 403;
             case 'NOT_FOUND':
                 return 404;
+            case 'CONFLICT':
+            case 'UNIQUE_CONSTRAINT_ERROR':
+                return 409;
+            case 'RATE_LIMITED':
+                return 429;
             case 'NETWORK_ERROR':
+            case 'CONNECTION_ERROR':
                 return 503;
+            case 'EXTERNAL_ERROR':
+                return 502;
             case 'PARSE_ERROR':
             case 'HTTP_ERROR':
                 // For HTTP errors, check if we stored the status in metadata
@@ -217,9 +222,10 @@ export class Fault extends Error {
      *   .withMetadata('userId', 123)
      *   .withMetadata('operation', 'CREATE_USER')
      */
-    withMetadata(key: string, value: unknown): this {
-        this.#metadata[key] = value;
-        return this;
+    withMetadata(key: string, value: unknown): this;
+    withMetadata(data: Record<string, unknown>): this;
+    withMetadata(keyOrData: string | Record<string, unknown>, value?: unknown): this {
+        return this.withContext(typeof keyOrData === 'string' ? { [keyOrData]: value } : keyOrData);
     }
 
     /**
@@ -239,6 +245,12 @@ export class Fault extends Error {
         for (const [key, value] of Object.entries(data)) {
             this.#metadata[key] = value;
         }
+        return this;
+    }
+
+    /** Attach the underlying cause (any thrown value). */
+    withCause(cause: unknown): this {
+        (this as Error & { cause?: unknown }).cause = cause;
         return this;
     }
 
@@ -300,121 +312,14 @@ export class Fault extends Error {
         return chain;
     }
 
-    /**
-     * Capture this fault to observability backends (OpenTelemetry or Sentry)
-     * Only call when you cannot recover from the error.
-     * This method gracefully degrades if neither OpenTelemetry nor Sentry is available.
-     * @returns this for chaining
-     *
-     * @example Using with neverthrow
-     * const result = await someOperation()
-     * if (result.isErr()) {
-     *   // Only capture if we can't recover
-     *   result.error.capture()
-     *   throw result.error
-     * }
-     *
-     * @example With logging
-     * result.match(
-     *   (data) => console.log('Success:', data),
-     *   (error) => {
-     *     error.capture()
-     *     logger.error(error.toJSON())
-     *   }
-     * )
-     */
+    /** Hook invoked by `capture()`. Wire Sentry/OTel here, e.g.
+     *  `Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })` */
+    static onCapture: ((fault: Fault) => void) | undefined;
+
+    /** Send this fault to `Fault.onCapture` (if set) and return it unchanged. */
     capture(): this {
-        // Try OpenTelemetry first
-        if (!otel) {
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
-                otel = require('@opentelemetry/api');
-            } catch {
-                // OpenTelemetry not available
-            }
-        }
-
-        if (otel) {
-            try {
-                const tracer = otel.trace.getTracer('fault');
-                tracer.startActiveSpan('error.capture', (span: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-                    span.recordException(this);
-                    span.setStatus({ code: otel.SpanStatusCode.ERROR });
-                    span.end();
-                });
-            } catch {
-                // Error recording to OpenTelemetry, continue to Sentry
-            }
-        }
-
-        // Fallback to Sentry if available
-        if (!sentry) {
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
-                sentry = require('@sentry/node');
-            } catch {
-                // Sentry not available
-            }
-        }
-
-        if (sentry) {
-            try {
-                sentry.captureException(this, {
-                    contexts: {
-                        fault: {
-                            tag: this.#tag,
-                            details: this.#details,
-                            location: this.#location,
-                            metadata: this.#metadata,
-                        },
-                    },
-                });
-            } catch {
-                // Error capturing to Sentry, silently ignore
-            }
-        }
-
+        Fault.onCapture?.(this);
         return this;
-    }
-
-    /**
-     * Create a Fault from a Zod validation error
-     * @param error - The ZodError instance
-     * @returns A new Fault instance with validation details
-     *
-     * @example Using with safeZodParse
-     * import { safeZodParse } from '@itterno/fault'
-     * import { z } from 'zod'
-     *
-     * const schema = z.object({ email: z.string().email() })
-     * const result = safeZodParse(schema)({ email: 'invalid' })
-     *
-     * result.match(
-     *   (data) => console.log('Valid:', data),
-     *   (fault) => {
-     *     console.log(fault.metadata.fieldErrors)
-     *     // { email: ['Invalid email'] }
-     *   }
-     * )
-     */
-    static fromZod(error: unknown): Fault {
-        if (!(error instanceof z.ZodError)) {
-            return new Fault('Validation failed')
-                .withTag('VALIDATION_ERROR')
-                .withMetadata('error', error);
-        }
-
-        // Format issues into a user-friendly message
-        const firstIssue = error.issues[0];
-        const message = firstIssue?.message || 'Validation failed';
-
-        const fault = new Fault(`Validation failed: ${message}`)
-            .withTag('VALIDATION_ERROR')
-            .withMetadata('zodIssues', error.issues)
-            .withMetadata('issueCount', error.issues.length)
-            .withMetadata('fieldErrors', error.flatten().fieldErrors);
-
-        return fault;
     }
 }
 
@@ -441,6 +346,18 @@ export type FaultTag =
     | 'HTTP_ERROR'
     // Data errors
     | 'VALIDATION_ERROR'
+    | 'BAD_REQUEST'
+    | 'UNAUTHORIZED'
+    | 'FORBIDDEN'
+    | 'CONFLICT'
+    | 'RATE_LIMITED'
+    | 'PAYMENT_FAILED'
+    | 'EXTERNAL_ERROR'
+    | 'CONFIGURATION_ERROR'
+    | 'CONNECTION_ERROR'
+    | 'UNIQUE_CONSTRAINT_ERROR'
+    | 'FOREIGN_KEY_ERROR'
+    | 'TRANSACTION_ROLLBACK_ERROR'
     // Catch-all errors
     | 'INTERNAL_ERROR'
     | 'UNKNOWN_ERROR'
@@ -467,77 +384,3 @@ export type FaultTag =
 export const ServiceError = (type: FaultTag, message: string, description?: string) =>
     new Fault(message).withTag(type).withDescription(description ?? message);
 
-/**
- * Create a Fault from a Drizzle or PostgreSQL error
- * Handles DrizzleQueryError, TransactionRollbackError, and PostgreSQL DatabaseError
- *
- * @param cause - The error to convert (from Drizzle or pg)
- * @returns Fault with appropriate tag, message, and metadata
- *
- * @example Using with neverthrow in database operations
- * import { ResultAsync, ok, err, DatabaseError } from '@itterno/fault'
- *
- * try {
- *   const user = await db.insert(users).values(userData).returning()
- *   return ok(user)
- * } catch (error) {
- *   return err(DatabaseError(error))
- * }
- *
- * @example With safeDb utility (recommended)
- * import { safeDb } from '@itterno/fault'
- *
- * const result = await safeDb(db.insert(users).values(userData).returning())
- * result.match(
- *   (user) => console.log('Created:', user),
- *   (fault) => console.error('Error:', fault.message)
- * )
- *
- * @see https://github.com/drizzle-team/drizzle-orm/discussions/916
- */
-export function DatabaseError(cause: unknown): Fault {
-    if (cause instanceof TransactionRollbackError) {
-        const causedByError = (cause as unknown as { cause?: unknown }).cause;
-        if (causedByError instanceof PgDatabaseError) {
-            return parsePgError(causedByError as PgDatabaseError);
-        }
-        const message = (cause as unknown as { message?: string }).message ?? 'Transaction rollback error';
-        return new Fault(message)
-            .withTag('DATABASE_ERROR')
-            .withDescription('Transaction rollback error', message);
-    }
-
-    // Check for DrizzleQueryError which wraps PostgreSQL errors
-    if (cause instanceof DrizzleQueryError) {
-        // The actual PostgreSQL error is in error.cause
-        const causedByError = (cause as unknown as { cause?: unknown }).cause;
-        if (causedByError instanceof PgDatabaseError) {
-            return parsePgError(causedByError as PgDatabaseError);
-        }
-
-        const message = (cause as unknown as { message?: string }).message ?? 'Drizzle query error';
-        return new Fault(message)
-            .withTag('DATABASE_ERROR')
-            .withDescription('Drizzle query error', message);
-    }
-
-    // Fallback for generic Drizzle errors or other Error instances
-    if (cause instanceof DrizzleError || cause instanceof Error) {
-        const causedByError = (cause as unknown as { cause?: unknown }).cause;
-        if (
-            Object.prototype.hasOwnProperty.call(cause, 'cause') &&
-            causedByError instanceof PgDatabaseError
-        ) {
-            return parsePgError(causedByError as PgDatabaseError);
-        }
-
-        const message = (cause as unknown as { message?: string }).message ?? 'Drizzle error';
-        return new Fault(message)
-            .withTag('DATABASE_ERROR')
-            .withDescription('Drizzle error', message);
-    }
-
-    return new Fault(String(cause))
-        .withTag('DATABASE_ERROR')
-        .withDescription('Unknown database error', String(cause));
-}
