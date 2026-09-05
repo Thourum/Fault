@@ -21,7 +21,7 @@ function isPostgresError(error: unknown): error is PgDatabaseError {
 function extractFieldFromDetail(detail: string | undefined): string | null {
     if (!detail) return null;
 
-    const keyRegex = /Key \(([^)]+)\)/;
+    const keyRegex = /Key \(([^)]+)\)=/;
     const match = detail.match(keyRegex);
 
     if (match && match[1]) {
@@ -60,6 +60,7 @@ export function parsePgError(error: PgDatabaseError): Fault {
 
     // Create base fault with original error
     const fault = new Fault(pgError)
+        .withCause(error)
         .withMetadata('pgCode', code)
         .withMetadata('pgDetail', pgError.detail)
         .withMetadata('pgTable', pgError.table)
