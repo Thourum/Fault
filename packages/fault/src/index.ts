@@ -29,3 +29,4 @@ export {
 
 // Export Fault and related utilities
 export { Fault, ServiceError, type FaultTag } from './fault';
+export { retry, type RetryOptions } from './retry';
