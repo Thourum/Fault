@@ -20,7 +20,7 @@ describe('parsePgError', () => {
   })
   it('23514 → VALIDATION_ERROR', () => expect(parsePgError(pgErr('23514')).tag).toBe('VALIDATION_ERROR'))
   it.each(['42P01', '42703', '57014'])('%s → DATABASE_ERROR', (c) => expect(parsePgError(pgErr(c)).tag).toBe('DATABASE_ERROR'))
-  it.each(['08000', '08001', '08003', '08004', '08006', '08007', 'ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'])('%s → CONNECTION_ERROR', (c) =>
+  it.each(['08000', '08001', '08003', '08004', '08006', '08007', '08P01', 'ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'])('%s → CONNECTION_ERROR', (c) =>
     expect(parsePgError(pgErr(c)).tag).toBe('CONNECTION_ERROR'))
   it.each(['40001', '40P01'])('%s → TRANSACTION_ROLLBACK_ERROR', (c) => expect(parsePgError(pgErr(c)).tag).toBe('TRANSACTION_ROLLBACK_ERROR'))
   it('unknown code → DATABASE_ERROR', () => expect(parsePgError(pgErr('99999')).tag).toBe('DATABASE_ERROR'))

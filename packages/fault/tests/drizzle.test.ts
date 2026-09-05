@@ -31,6 +31,14 @@ describe('DatabaseError', () => {
   it('non-Error → DATABASE_ERROR with String(cause) message', () => {
     expect(DatabaseError('weird').message).toBe('weird')
   })
+  it('DrizzleQueryError wrapping node system error → CONNECTION_ERROR', () => {
+    const refused = Object.assign(new Error('refused'), { code: 'ECONNREFUSED' })
+    const f = DatabaseError(new DrizzleQueryError('q', [], refused))
+    expect(f.tag).toBe('CONNECTION_ERROR'); expect(f.cause).toBe(refused)
+  })
+  it('bare node system error → CONNECTION_ERROR', () => {
+    expect(DatabaseError(Object.assign(new Error('x'), { code: 'ECONNREFUSED' })).tag).toBe('CONNECTION_ERROR')
+  })
 })
 
 describe('safeDb', () => {

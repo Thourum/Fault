@@ -4,7 +4,7 @@ import type { DatabaseError as PgDatabaseError } from 'pg';
 /**
  * Check if an error is a PostgreSQL error
  */
-function isPostgresError(error: unknown): error is PgDatabaseError {
+export function isPostgresError(error: unknown): error is PgDatabaseError {
     return (
         error instanceof Error &&
         'code' in error &&
@@ -52,7 +52,8 @@ export function parsePgError(error: PgDatabaseError): Fault {
         // Not a PostgreSQL error, return generic database error
         return new Fault(error as Error)
             .withTag('DATABASE_ERROR')
-            .withDescription('Database operation failed', 'An unexpected database error occurred.');
+            .withDescription('Database operation failed', 'An unexpected database error occurred.')
+            .withCause(error);
     }
 
     const pgError = error;
@@ -156,13 +157,7 @@ export function parsePgError(error: PgDatabaseError): Fault {
                 );
         }
 
-        // Class 08 - Connection Exception
-        case '08000':
-        case '08001':
-        case '08003':
-        case '08004':
-        case '08006':
-        case '08007':
+        // Class 08 - Connection Exception (whole class, see below) + node system errors
         case 'ECONNREFUSED':
         case 'ENOTFOUND':
         case 'ETIMEDOUT': {
@@ -189,6 +184,16 @@ export function parsePgError(error: PgDatabaseError): Fault {
 
         // Default case - generic database error
         default: {
+            if (code.startsWith('08')) {
+                // Class 08 - Connection Exception
+                return fault
+                    .withTag('CONNECTION_ERROR')
+                    .withDescription(
+                        'Database connection failed',
+                        'Unable to connect to the database. Please try again later.'
+                    );
+            }
+
             return fault
                 .withTag('DATABASE_ERROR')
                 .withDescription(

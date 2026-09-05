@@ -11,6 +11,17 @@ const tagForStatus = (status: number): FaultTag => {
     return 'BAD_REQUEST';
 };
 
+const networkFault = (error: unknown): Fault => {
+    const err = error instanceof Error ? error : new Error(String(error));
+    return new Fault(err)
+        .withTag('NETWORK_ERROR')
+        .withDescription(
+            'Network request failed',
+            'Unable to connect to the server. Please check your internet connection.'
+        )
+        .withCause(err);
+};
+
 /**
  * Safely perform a fetch request, returning a ResultAsync type
  *
@@ -132,18 +143,9 @@ export function safeFetch<T = unknown>(
     input: URL | string,
     init?: RequestInit
 ): ResultAsync<T, Fault> {
-    return ResultAsync.fromPromise(fetch(input, init), (error: unknown): Fault => {
-        const err = error instanceof Error ? error : new Error(String(error));
-        return new Fault(err)
-            .withTag('NETWORK_ERROR')
-            .withDescription(
-                'Network request failed',
-                'Unable to connect to the server. Please check your internet connection.'
-            )
-            .withCause(err);
-    }).andThen((response: Response) => {
+    return ResultAsync.fromPromise(fetch(input, init), networkFault).andThen((response: Response) => {
         if (!response.ok) {
-            return ResultAsync.fromSafePromise(response.text()).andThen((text) => {
+            return ResultAsync.fromPromise(response.text(), networkFault).andThen((text) => {
                 let httpBody: unknown = text;
                 try {
                     httpBody = JSON.parse(text);
@@ -169,10 +171,10 @@ export function safeFetch<T = unknown>(
             });
         }
 
-        return ResultAsync.fromSafePromise(response.text()).andThen((text) => {
-            const isJson = (response.headers.get('content-type') ?? '').includes(
-                'application/json'
-            );
+        return ResultAsync.fromPromise(response.text(), networkFault).andThen((text) => {
+            const isJson = (response.headers.get('content-type') ?? '')
+                .toLowerCase()
+                .includes('application/json');
             if (response.status === 204 || !isJson || text === '') {
                 return okAsync(undefined as T);
             }

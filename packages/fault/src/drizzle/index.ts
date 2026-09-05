@@ -1,12 +1,15 @@
 import { DrizzleError, DrizzleQueryError, TransactionRollbackError } from 'drizzle-orm/errors'
-import { DatabaseError as PgDatabaseError } from 'pg'
+import type { DatabaseError as PgDatabaseError } from 'pg'
 import { ResultAsync } from '../result-async'
 import { Fault } from '../fault'
-import { parsePgError } from '../pg/index'
+import { isPostgresError, parsePgError } from '../pg/index'
 
+// Duck-typed (Error with string `code`): node system errors like ECONNREFUSED are not pg.DatabaseError.
 const pgCauseOf = (e: unknown): PgDatabaseError | undefined => {
-    const cause = (e as { cause?: unknown } | undefined)?.cause
-    return cause instanceof PgDatabaseError ? cause : undefined
+    const inner = e instanceof Error ? e.cause : undefined
+    if (isPostgresError(inner)) return inner
+    if (isPostgresError(e)) return e
+    return undefined
 }
 
 /** Map any drizzle/pg/unknown rejection into a Fault. */

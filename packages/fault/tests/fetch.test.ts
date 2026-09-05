@@ -45,4 +45,18 @@ describe('safeFetch', () => {
     stub(500, 'oops', { 'content-type': 'text/plain' })
     expect((await safeFetch('http://x'))._unsafeUnwrapErr().metadata.httpBody).toBe('oops')
   })
+  it('parses JSON when content-type casing differs', async () => {
+    stub(200, '{"a":1}', { 'content-type': 'Application/JSON; charset=utf-8' })
+    expect((await safeFetch<{ a: number }>('http://x'))._unsafeUnwrap()).toEqual({ a: 1 })
+  })
+  it.each([200, 500])('NETWORK_ERROR when body read rejects (status %i)', async (status) => {
+    const boom = new Error('body stream broke')
+    globalThis.fetch = (async () => {
+      const res = new Response('{}', { status, headers: { 'content-type': 'application/json' } })
+      res.text = () => Promise.reject(boom)
+      return res
+    }) as unknown as typeof fetch
+    const f = (await safeFetch('http://x'))._unsafeUnwrapErr()
+    expect(f.tag).toBe('NETWORK_ERROR'); expect(f.cause).toBe(boom)
+  })
 })

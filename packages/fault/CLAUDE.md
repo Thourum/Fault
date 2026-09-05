@@ -24,7 +24,7 @@ Default to using Bun instead of Node.js.
 - `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
 - `Bun.redis` for Redis. Don't use `ioredis`.
 - `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
+- Library source (`src/`) uses `node:` builtins, not `Bun.*` APIs — the package must run under plain Node.
 - Bun.$`ls` instead of execa.
 
 ## Testing
