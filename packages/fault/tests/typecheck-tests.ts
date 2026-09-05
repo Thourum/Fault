@@ -160,12 +160,12 @@ type CreateTuple<L, V = string> =
     });
   });
 
-  (function describe(_ = 'andThrough') {
+  (function describe(_ = 'andCheck') {
     (function it(_ = 'Combines two equal error types (native scalar types)') {
       type Expectation = Result<number, string>
 
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => err('yoooooo dude' + val))
+        .andCheck((val) => err('yoooooo dude' + val))
     });
 
     (function it(_ = 'Combines two equal error types (custom types)') {
@@ -177,7 +177,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, MyError>
 
       const result: Expectation = ok<number, MyError>(123)
-        .andThrough((val) => err<string, MyError>({ stack: '/blah', code: 500 }))
+        .andCheck((val) => err<string, MyError>({ stack: '/blah', code: 500 }))
     });
 
     (function it(_ = 'Creates a union of error types for disjoint types') {
@@ -189,14 +189,14 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, MyError | string[]>
 
       const result: Expectation = ok<number, MyError>(123)
-        .andThrough((val) => err<string, string[]>(['oh nooooo']))
+        .andCheck((val) => err<string, string[]>(['oh nooooo']))
     });
 
     (function it(_ = 'Infers error type when returning disjoint types (native scalar types)') {
       type Expectation = Result<number, string | number | boolean>
 
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -216,7 +216,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, string | number | MyError>
 
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -232,7 +232,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, unknown>
 
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -247,7 +247,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, unknown>
 
       const result: Expectation = initial
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -265,7 +265,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, string | number | MyError>
   
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -280,7 +280,7 @@ type CreateTuple<L, V = string> =
     (function it(_ = 'allows specifying the E type explicitly') {
       type Expectation = Result<number, string>
 
-      const result: Expectation = ok(123).andThrough<string>(val => {
+      const result: Expectation = ok(123).andCheck<string>(val => {
         return ok('yo')
       })
     });
@@ -474,12 +474,12 @@ type CreateTuple<L, V = string> =
     });
   });
 
-  (function describe(_ = 'asyncAndThrough') {
+  (function describe(_ = 'asyncAndCheck') {
     (function it(_ = 'Combines two equal error types (native scalar types)') {
       type Expectation = ResultAsync<unknown, string>
 
       const result: Expectation = ok<number, string>(123)
-        .asyncAndThrough((val) => errAsync('yoooooo dude' + val))
+        .asyncAndCheck((val) => errAsync('yoooooo dude' + val))
     });
 
     (function it(_ = 'Combines two equal error types (custom types)') {
@@ -491,7 +491,7 @@ type CreateTuple<L, V = string> =
       type Expectation = ResultAsync<number, MyError>
 
       const result: Expectation = ok<number, MyError>(123)
-        .asyncAndThrough((val) => errAsync<string, MyError>({ stack: '/blah', code: 500 }))
+        .asyncAndCheck((val) => errAsync<string, MyError>({ stack: '/blah', code: 500 }))
     });
 
     (function it(_ = 'Creates a union of error types for disjoint types') {
@@ -503,14 +503,14 @@ type CreateTuple<L, V = string> =
       type Expectation = ResultAsync<number, MyError | string[]>
 
       const result: Expectation = ok<number, MyError>(123)
-        .asyncAndThrough((val) => errAsync<string, string[]>(['oh nooooo']))
+        .asyncAndCheck((val) => errAsync<string, string[]>(['oh nooooo']))
     });
 
     (function it(_ = 'Infers error type when returning disjoint types (native scalar types)') {
       type Expectation = ResultAsync<number, string | number | boolean>
 
       const result: Expectation = ok<number, string>(123)
-        .asyncAndThrough((val) => {
+        .asyncAndCheck((val) => {
           switch (val) {
             case 1:
               return errAsync('yoooooo dude' + val)
@@ -530,7 +530,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, string | number | MyError>
 
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -546,7 +546,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, unknown>
 
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -561,7 +561,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, unknown>
 
       const result: Expectation = initial
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -579,7 +579,7 @@ type CreateTuple<L, V = string> =
       type Expectation = Result<number, string | number | MyError>
   
       const result: Expectation = ok<number, string>(123)
-        .andThrough((val) => {
+        .andCheck((val) => {
           switch (val) {
             case 1:
               return err('yoooooo dude' + val)
@@ -594,7 +594,7 @@ type CreateTuple<L, V = string> =
     (function it(_ = 'allows specifying the E type explicitly') {
       type Expectation = Result<number, string>
 
-      const result: Expectation = ok(123).andThrough<string>(val => {
+      const result: Expectation = ok(123).andCheck<string>(val => {
         return ok('yo')
       })
     });
@@ -608,7 +608,7 @@ type CreateTuple<L, V = string> =
       type Expectation = ResultAsync<number, string | number | MyError>
   
       const result: Expectation = ok<number, string>(123)
-        .asyncAndThrough((val) => {
+        .asyncAndCheck((val) => {
           switch (val) {
             case 1:
               return errAsync('yoooooo dude' + val)

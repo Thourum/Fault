@@ -100,12 +100,12 @@ describe('Result.Ok', () => {
     })
   })
 
-  describe('andThrough', () => {
+  describe('andCheck', () => {
     it('Calls the passed function but returns an original ok', () => {
       const okVal = ok(12)
       const passedFn = mock((_number) => ok(undefined))
 
-      const thrued = okVal.andThrough(passedFn)
+      const thrued = okVal.andCheck(passedFn)
       expect(thrued.isOk()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
       expect(thrued._unsafeUnwrap()).toStrictEqual(12)
@@ -132,12 +132,12 @@ describe('Result.Ok', () => {
     })
   })
 
-  describe('andTee', () => {
+  describe('andInspect', () => {
     it('Calls the passed function but returns an original ok', () => {
       const okVal = ok(12)
       const passedFn = mock((_number) => {})
 
-      const teed = okVal.andTee(passedFn)
+      const teed = okVal.andInspect(passedFn)
 
       expect(teed.isOk()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -149,7 +149,7 @@ describe('Result.Ok', () => {
         throw new Error('OMG!')
       })
 
-      const teed = okVal.andTee(passedFn)
+      const teed = okVal.andInspect(passedFn)
 
       expect(teed.isOk()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -157,12 +157,12 @@ describe('Result.Ok', () => {
     })
   })
 
-  describe('orTee', () => {
+  describe('orInspect', () => {
     it('Calls the passed function but returns an original err', () => {
       const errVal = err(12)
       const passedFn = mock((_number) => {})
 
-      const teed = errVal.orTee(passedFn)
+      const teed = errVal.orInspect(passedFn)
 
       expect(teed.isErr()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -174,7 +174,7 @@ describe('Result.Ok', () => {
         throw new Error('OMG!')
       })
 
-      const teed = errVal.orTee(passedFn)
+      const teed = errVal.orInspect(passedFn)
 
       expect(teed.isErr()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -182,12 +182,12 @@ describe('Result.Ok', () => {
     })
   })
 
-  describe('asyncAndThrough', () => {
+  describe('asyncAndCheck', () => {
     it('Calls the passed function but returns an original ok as Async', async () => {
       const okVal = ok(12)
       const passedFn = mock((_number) => okAsync(undefined))
 
-      const teedAsync = okVal.asyncAndThrough(passedFn)
+      const teedAsync = okVal.asyncAndCheck(passedFn)
       expect(teedAsync).toBeInstanceOf(ResultAsync)
       const teed = await teedAsync
       expect(teed.isOk()).toBe(true)
@@ -359,36 +359,36 @@ describe('Result.Err', () => {
     expect(errVal._unsafeUnwrapErr()).toEqual('Yolo')
   })
 
-  it('Skips over andThrough', () => {
+  it('Skips over andCheck', () => {
     const errVal = err('Yolo')
 
     const mapper = mock((_val) => ok<void, string>(undefined))
 
-    const hopefullyNotFlattened = errVal.andThrough(mapper)
+    const hopefullyNotFlattened = errVal.andCheck(mapper)
 
     expect(hopefullyNotFlattened.isErr()).toBe(true)
     expect(mapper).not.toHaveBeenCalled()
     expect(errVal._unsafeUnwrapErr()).toEqual('Yolo')
   })
 
-  it('Skips over andTee', () => {
+  it('Skips over andInspect', () => {
     const errVal = err('Yolo')
 
     const mapper = mock((_val) => {})
 
-    const hopefullyNotFlattened = errVal.andTee(mapper)
+    const hopefullyNotFlattened = errVal.andInspect(mapper)
 
     expect(hopefullyNotFlattened.isErr()).toBe(true)
     expect(mapper).not.toHaveBeenCalled()
     expect(errVal._unsafeUnwrapErr()).toEqual('Yolo')
   })
 
-  it('Skips over asyncAndThrough but returns ResultAsync instead', async () => {
+  it('Skips over asyncAndCheck but returns ResultAsync instead', async () => {
     const errVal = err('Yolo')
 
     const mapper = mock((_val) => okAsync<string, unknown>('Async'))
 
-    const hopefullyNotFlattened = errVal.asyncAndThrough(mapper)
+    const hopefullyNotFlattened = errVal.asyncAndCheck(mapper)
     expect(hopefullyNotFlattened).toBeInstanceOf(ResultAsync)
 
     const result = await hopefullyNotFlattened
@@ -975,7 +975,7 @@ describe('ResultAsync', () => {
     })
   })
 
-  describe('andThrough', () => {
+  describe('andCheck', () => {
     it('Returns the original value when map function returning ResultAsync succeeds', async () => {
       const asyncVal = okAsync(12)
       /*
@@ -984,9 +984,9 @@ describe('ResultAsync', () => {
         DB persistence (create or update)
         API calls (create or update)
       */
-      const andThroughResultAsyncFn = mock(() => okAsync('good'))
+      const andCheckResultAsyncFn = mock(() => okAsync('good'))
 
-      const thrued = asyncVal.andThrough(andThroughResultAsyncFn)
+      const thrued = asyncVal.andCheck(andCheckResultAsyncFn)
 
       expect(thrued).toBeInstanceOf(ResultAsync)
 
@@ -994,15 +994,15 @@ describe('ResultAsync', () => {
 
       expect(result.isOk()).toBe(true)
       expect(result._unsafeUnwrap()).toBe(12)
-      expect(andThroughResultAsyncFn).toHaveBeenCalledTimes(1)
+      expect(andCheckResultAsyncFn).toHaveBeenCalledTimes(1)
     })
 
     it('Maps to an error when map function returning ResultAsync fails', async () => {
       const asyncVal = okAsync(12)
 
-      const andThroughResultAsyncFn = mock(() => errAsync('oh no!'))
+      const andCheckResultAsyncFn = mock(() => errAsync('oh no!'))
 
-      const thrued = asyncVal.andThrough(andThroughResultAsyncFn)
+      const thrued = asyncVal.andCheck(andCheckResultAsyncFn)
 
       expect(thrued).toBeInstanceOf(ResultAsync)
 
@@ -1010,15 +1010,15 @@ describe('ResultAsync', () => {
 
       expect(result.isErr()).toBe(true)
       expect(result._unsafeUnwrapErr()).toBe('oh no!')
-      expect(andThroughResultAsyncFn).toHaveBeenCalledTimes(1)
+      expect(andCheckResultAsyncFn).toHaveBeenCalledTimes(1)
     })
 
     it('Returns the original value when map function returning Result succeeds', async () => {
       const asyncVal = okAsync(12)
 
-      const andThroughResultFn = mock(() => ok('good'))
+      const andCheckResultFn = mock(() => ok('good'))
 
-      const thrued = asyncVal.andThrough(andThroughResultFn)
+      const thrued = asyncVal.andCheck(andCheckResultFn)
 
       expect(thrued).toBeInstanceOf(ResultAsync)
 
@@ -1026,15 +1026,15 @@ describe('ResultAsync', () => {
 
       expect(newVal.isOk()).toBe(true)
       expect(newVal._unsafeUnwrap()).toBe(12)
-      expect(andThroughResultFn).toHaveBeenCalledTimes(1)
+      expect(andCheckResultFn).toHaveBeenCalledTimes(1)
     })
 
     it('Maps to an error when map function returning Result fails', async () => {
       const asyncVal = okAsync(12)
 
-      const andThroughResultFn = mock(() => err('oh no!'))
+      const andCheckResultFn = mock(() => err('oh no!'))
 
-      const thrued = asyncVal.andThrough(andThroughResultFn)
+      const thrued = asyncVal.andCheck(andCheckResultFn)
 
       expect(thrued).toBeInstanceOf(ResultAsync)
 
@@ -1042,15 +1042,15 @@ describe('ResultAsync', () => {
 
       expect(newVal.isErr()).toBe(true)
       expect(newVal._unsafeUnwrapErr()).toBe('oh no!')
-      expect(andThroughResultFn).toHaveBeenCalledTimes(1)
+      expect(andCheckResultFn).toHaveBeenCalledTimes(1)
     })
 
     it('Skips an Error', async () => {
       const asyncVal = errAsync<string, string>('Wrong format')
 
-      const andThroughResultFn = mock(() => ok<string, string>('good'))
+      const andCheckResultFn = mock(() => ok<string, string>('good'))
 
-      const notMapped = asyncVal.andThrough(andThroughResultFn)
+      const notMapped = asyncVal.andCheck(andCheckResultFn)
 
       expect(notMapped).toBeInstanceOf(ResultAsync)
 
@@ -1058,16 +1058,16 @@ describe('ResultAsync', () => {
 
       expect(newVal.isErr()).toBe(true)
       expect(newVal._unsafeUnwrapErr()).toBe('Wrong format')
-      expect(andThroughResultFn).toHaveBeenCalledTimes(0)
+      expect(andCheckResultFn).toHaveBeenCalledTimes(0)
     })
   })
 
-  describe('andTee', () => {
+  describe('andInspect', () => {
     it('Calls the passed function but returns an original ok', async () => {
       const okVal = okAsync(12)
       const passedFn = mock((_number) => {})
 
-      const teed = await okVal.andTee(passedFn)
+      const teed = await okVal.andInspect(passedFn)
 
       expect(teed.isOk()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -1079,7 +1079,7 @@ describe('ResultAsync', () => {
         throw new Error('OMG!')
       })
 
-      const teed = await okVal.andTee(passedFn)
+      const teed = await okVal.andInspect(passedFn)
 
       expect(teed.isOk()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -1087,12 +1087,12 @@ describe('ResultAsync', () => {
     })
   })
 
-  describe('orTee', () => {
+  describe('orInspect', () => {
     it('Calls the passed function but returns an original err', async () => {
       const errVal = errAsync(12)
       const passedFn = mock((_number) => {})
 
-      const teed = await errVal.orTee(passedFn)
+      const teed = await errVal.orInspect(passedFn)
 
       expect(teed.isErr()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)
@@ -1104,7 +1104,7 @@ describe('ResultAsync', () => {
         throw new Error('OMG!')
       })
 
-      const teed = await errVal.orTee(passedFn)
+      const teed = await errVal.orInspect(passedFn)
 
       expect(teed.isErr()).toBe(true)
       expect(passedFn).toHaveBeenCalledTimes(1)

@@ -209,17 +209,13 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
   }
 
   /**
-   * Passes the current value to a computation but ignores its result or errors.
-   * If the computation throws, the error is ignored.
+   * Checks the current value via a Result-returning function. On Ok the original
+   * value is kept; on Err that error is passed downstream.
    *
-   * Useful for side effects like logging or metrics that should not affect the main result.
-   *
-   * This method does not care about the result of the passed in computation.
-   *
-   * @param f The function to apply to the current value (for side effects)
-   * @returns The original `ResultAsync` unchanged
+   * @param f The function to apply to the current value
+   * @returns The original `ResultAsync` on Ok, or the error from `f`
    */
-  andThrough<F>(f: (t: T) => Result<unknown, F> | ResultAsync<unknown, F>): ResultAsync<T, E | F> {
+  andCheck<F>(f: (t: T) => Result<unknown, F> | ResultAsync<unknown, F>): ResultAsync<T, E | F> {
     return new ResultAsync(
       this._promise.then(async (res: Result<T, E>) => {
         if (res.isErr()) {
@@ -236,7 +232,8 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
   }
 
   /**
-   * Passes the current value to a function for side effects but still returns the same value.
+   * Inspects the current value via a side-effect function but still returns
+   * the same value.
    *
    * This is useful for operations like logging that should not affect the main chain.
    * If the function throws, the error is ignored.
@@ -246,7 +243,7 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
    * @param f The function to apply to the current value (for side effects)
    * @returns The original `ResultAsync` unchanged
    */
-  andTee(f: (t: T) => unknown): ResultAsync<T, E> {
+  andInspect(f: (t: T) => unknown): ResultAsync<T, E> {
     return new ResultAsync(
       this._promise.then(async (res: Result<T, E>) => {
         if (res.isErr()) {
@@ -255,7 +252,7 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
         try {
           await f(res.value)
         } catch (e) {
-          // Tee does not care about the error
+          // Inspect does not care about the error
         }
         return new Ok<T, E>(res.value)
       }),
@@ -263,7 +260,8 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
   }
 
   /**
-   * Passes the current error value to a function for side effects but still returns the same error.
+   * Inspects the current error via a side-effect function but still returns
+   * the same error.
    *
    * This is useful for operations like error logging that should not affect the main chain.
    * If the function throws, the error is ignored.
@@ -273,7 +271,7 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
    * @param f The function to apply to the current error (for side effects)
    * @returns The original `ResultAsync` unchanged
    */
-  orTee(f: (t: E) => unknown): ResultAsync<T, E> {
+  orInspect(f: (t: E) => unknown): ResultAsync<T, E> {
     return new ResultAsync(
       this._promise.then(async (res: Result<T, E>) => {
         if (res.isOk()) {
@@ -282,7 +280,7 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
         try {
           await f(res.error)
         } catch (e) {
-          // Tee does not care about the error
+          // Inspect does not care about the error
         }
         return new Err<T, E>(res.error)
       }),
