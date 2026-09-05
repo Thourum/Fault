@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tests/tsconfig.tests.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tests/tsconfig.tests.json && tsgo --noEmit -p ../../examples/tsconfig.json",
     "test": "bun test",
     "check:exports": "attw --pack . --profile esm-only",
     "local-ci": "bun run typecheck && bun run test && bun run build && bun run check:exports"

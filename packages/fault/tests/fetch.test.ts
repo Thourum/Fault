@@ -5,7 +5,7 @@ const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
 
 const stub = (status: number, body: string, headers: Record<string, string> = { 'content-type': 'application/json' }) => {
-  globalThis.fetch = (async () => new Response(body, { status, headers })) as typeof fetch
+  globalThis.fetch = (async () => new Response(body, { status, headers })) as unknown as typeof fetch
 }
 
 describe('safeFetch', () => {
@@ -22,7 +22,7 @@ describe('safeFetch', () => {
       expect(f.metadata.httpBody).toEqual({ error: 'x' })
     })
   it('NETWORK_ERROR when fetch throws', async () => {
-    globalThis.fetch = (async () => { throw new TypeError('ECONNREFUSED') }) as typeof fetch
+    globalThis.fetch = (async () => { throw new TypeError('ECONNREFUSED') }) as unknown as typeof fetch
     const f = (await safeFetch('http://x'))._unsafeUnwrapErr()
     expect(f.tag).toBe('NETWORK_ERROR')
     expect(f.cause).toBeInstanceOf(TypeError)
