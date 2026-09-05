@@ -13,4 +13,5 @@ export default defineConfig({
   platform: 'node',
   dts: true,
   clean: true,
+  outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
 })

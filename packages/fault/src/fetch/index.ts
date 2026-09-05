@@ -24,7 +24,7 @@ const tagForStatus = (status: number): FaultTag => {
  * @returns ResultAsync<T, Fault> - Either the parsed response or a Fault error
  *
  * @example Basic GET request
- * import { safeFetch } from '@itterno/fault'
+ * import { safeFetch } from '@itterno/fault/fetch'
  *
  * const result = await safeFetch<{ id: number; name: string }>('https://api.example.com/users/1')
  *
@@ -46,7 +46,7 @@ const tagForStatus = (status: number): FaultTag => {
  * result.match(
  *   (newUser) => console.log('Created:', newUser.id),
  *   (fault) => {
- *     if (fault.tag === 'VALIDATION_ERROR') {
+ *     if (fault.tag === 'BAD_REQUEST') {
  *       console.error('Invalid input:', fault.details)
  *     } else if (fault.tag === 'NETWORK_ERROR') {
  *       console.error('Network issue:', fault.message)
@@ -55,7 +55,8 @@ const tagForStatus = (status: number): FaultTag => {
  * )
  *
  * @example Chaining with Zod validation
- * import { safeZodParse, okAsync } from '@itterno/fault'
+ * import { okAsync } from '@itterno/fault'
+ * import { safeZodParse } from '@itterno/fault/zod'
  * import { z } from 'zod'
  *
  * const userSchema = z.object({
@@ -75,7 +76,7 @@ const tagForStatus = (status: number): FaultTag => {
  *   (data) => console.log('Success:', data),
  *   (fault) => {
  *     switch (fault.tag) {
- *       case 'VALIDATION_ERROR': // 4xx client errors
+ *       case 'BAD_REQUEST': // 4xx client errors
  *         console.error('Client error:', fault.metadata.httpStatus)
  *         break
  *       case 'NOT_FOUND': // 404 specifically

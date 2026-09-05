@@ -39,7 +39,7 @@ function extractFieldFromDetail(detail: string | undefined): string | null {
  * @returns A Fault instance with appropriate tag and context
  *
  * @example
- * import { parsePgError } from '@itterno/fault';
+ * import { parsePgError } from '@itterno/fault/pg';
  * try {
  *   await db.insert(users).values(userData);
  * } catch (error) {

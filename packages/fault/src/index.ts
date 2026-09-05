@@ -1,16 +1,16 @@
 /**
  * @itterno/fault - Production-ready error handling for Node.js and TypeScript
  *
- * A comprehensive error handling library that combines Result types (from neverthrow)
- * with a powerful Fault error class that provides rich context preservation.
+ * Result types (from neverthrow) plus a Fault error class with rich context.
+ * Root exports are core-only. Integrations live on subpaths:
+ * `@itterno/fault/fetch`, `/zod`, `/drizzle`, `/pg`, `/std`.
  *
  * @example Quick start
- * import { ok, err, Result } from '@itterno/fault'
- * import { Fault } from '@itterno/fault'
- * import { safeFetch, safeZodParse, safeDb } from '@itterno/fault'
+ * import { ok, err, Result, Fault } from '@itterno/fault'
  *
- * function validateUser(data: unknown): Result<User, Fault> {
- *   return safeZodParse(userSchema, data)
+ * function greet(name: string): Result<string, Fault> {
+ *   if (!name) return err(new Fault('name required').withTag('VALIDATION_ERROR'))
+ *   return ok(`hello ${name}`)
  * }
  *
  * @packageDocumentation
