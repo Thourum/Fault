@@ -1,6 +1,15 @@
-import { errAsync, ResultAsync } from '../result-async';
-import { Fault } from '../fault';
-import type { FaultTag } from '../fault';
+import { errAsync, okAsync, ResultAsync } from '../result-async';
+import { Fault, type FaultTag } from '../fault';
+
+const tagForStatus = (status: number): FaultTag => {
+    if (status === 400) return 'BAD_REQUEST';
+    if (status === 401) return 'UNAUTHORIZED';
+    if (status === 403) return 'FORBIDDEN';
+    if (status === 404) return 'NOT_FOUND';
+    if (status === 429) return 'RATE_LIMITED';
+    if (status >= 500) return 'INTERNAL_ERROR';
+    return 'BAD_REQUEST';
+};
 
 /**
  * Safely perform a fetch request, returning a ResultAsync type
@@ -130,56 +139,56 @@ export function safeFetch<T = unknown>(
                 'Network request failed',
                 'Unable to connect to the server. Please check your internet connection.'
             )
-            .withMetadata('originalError', err.message);
+            .withCause(err);
     }).andThen((response: Response) => {
-        // It's a response but not 2XX
         if (!response.ok) {
-            // Parse the JSON as it might contain some useful info
-            return ResultAsync.fromSafePromise(
-                // Since we don't care about parse errors we can use `fromSafePromise`
-                // and just add a catch, which suppresses JSON parse errors
-                response.json().catch(() => undefined)
-            ).andThen((json: unknown) => {
-                // Map status codes to specific tags
-                let tag: FaultTag = 'HTTP_ERROR';
-                if (response.status === 404) {
-                    tag = 'NOT_FOUND';
-                } else if (response.status >= 400 && response.status < 500) {
-                    tag = 'VALIDATION_ERROR';
-                } else if (response.status >= 500) {
-                    tag = 'INTERNAL_ERROR';
+            return ResultAsync.fromSafePromise(response.text()).andThen((text) => {
+                let httpBody: unknown = text;
+                try {
+                    httpBody = JSON.parse(text);
+                } catch {
+                    // keep raw text as httpBody
                 }
 
-                // Store response headers as plain object
                 const headersObj: Record<string, string> = {};
                 response.headers.forEach((value: string, key: string) => {
                     headersObj[key] = value;
                 });
 
-                const fault = new Fault(`HTTP ${response.status}: ${response.statusText}`)
-                    .withTag(tag)
-                    .withMetadata('httpStatus', response.status)
-                    .withMetadata('httpStatusText', response.statusText)
-                    .withMetadata('httpHeaders', headersObj);
-
-                if (json !== undefined) {
-                    fault.withMetadata('httpBody', json);
-                }
-
-                return errAsync(fault);
+                return errAsync(
+                    new Fault(`HTTP ${response.status}: ${response.statusText}`)
+                        .withTag(tagForStatus(response.status))
+                        .withMetadata({
+                            httpStatus: response.status,
+                            httpStatusText: response.statusText,
+                            httpHeaders: headersObj,
+                            httpBody,
+                        })
+                );
             });
         }
 
-        // Response is 2XX - return the parsed JSON with an assigned optional type
-        return ResultAsync.fromPromise(response.json() as Promise<T>, (error: unknown): Fault => {
-            const err = error instanceof Error ? error : new Error(String(error));
-            return new Fault(err)
-                .withTag('PARSE_ERROR')
-                .withDescription(
-                    'Failed to parse response',
-                    'The server returned an invalid response. Please try again.'
-                )
-                .withMetadata('originalError', err.message);
+        return ResultAsync.fromSafePromise(response.text()).andThen((text) => {
+            const isJson = (response.headers.get('content-type') ?? '').includes(
+                'application/json'
+            );
+            if (response.status === 204 || !isJson || text === '') {
+                return okAsync(undefined as T);
+            }
+            try {
+                return okAsync(JSON.parse(text) as T);
+            } catch (error: unknown) {
+                const err = error instanceof Error ? error : new Error(String(error));
+                return errAsync(
+                    new Fault(err)
+                        .withTag('PARSE_ERROR')
+                        .withDescription(
+                            'Failed to parse response',
+                            'The server returned an invalid response. Please try again.'
+                        )
+                        .withCause(err)
+                );
+            }
         });
     });
 }
