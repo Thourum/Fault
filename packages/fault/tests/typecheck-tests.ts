@@ -13,7 +13,7 @@ import {
   Result,
   ResultAsync,
 } from '../src'
-import { safeTry, Transpose } from '../src/result'
+import { safeTry, type Transpose } from '../src/result'
 import { type N, Test } from 'ts-toolbelt'
 
 type CreateTuple<L, V = string> =

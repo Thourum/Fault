@@ -1,13 +1,13 @@
 import { errAsync, ResultAsync } from './'
-import { createNeverThrowError, ErrorConfig } from './_internals/error'
+import { createNeverThrowError, type ErrorConfig } from './_internals/error'
 import {
   combineResultList,
   combineResultListWithAllErrors,
-  ExtractErrTypes,
-  ExtractOkTypes,
-  InferAsyncErrTypes,
-  InferErrTypes,
-  InferOkTypes,
+  type ExtractErrTypes,
+  type ExtractOkTypes,
+  type InferAsyncErrTypes,
+  type InferErrTypes,
+  type InferOkTypes,
 } from './_internals/utils'
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -29,7 +29,7 @@ export namespace Result {
         const result = fn(...args)
         return ok(result)
       } catch (e) {
-        return err(errorFn ? errorFn(e) : e)
+        return err(errorFn ? errorFn(e) : (e as E))
       }
     }
   }

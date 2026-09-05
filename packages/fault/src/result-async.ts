@@ -11,12 +11,12 @@ import { Err, Ok, Result } from './'
 import {
   combineResultAsyncList,
   combineResultAsyncListWithAllErrors,
-  ExtractErrAsyncTypes,
-  ExtractOkAsyncTypes,
-  InferAsyncErrTypes,
-  InferAsyncOkTypes,
-  InferErrTypes,
-  InferOkTypes,
+  type ExtractErrAsyncTypes,
+  type ExtractOkAsyncTypes,
+  type InferAsyncErrTypes,
+  type InferAsyncOkTypes,
+  type InferErrTypes,
+  type InferOkTypes,
 } from './_internals/utils'
 
 export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
@@ -102,7 +102,7 @@ export class ResultAsync<T, E> implements PromiseLike<Result<T, E>> {
           try {
             return new Ok(await fn(...args))
           } catch (error) {
-            return new Err(errorFn ? errorFn(error) : error)
+            return new Err(errorFn ? errorFn(error) : (error as E))
           }
         })(),
       )

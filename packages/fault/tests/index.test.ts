@@ -740,14 +740,14 @@ describe('Utils', () => {
       })
     })
 
-    describe('testdouble `ResultAsync.combine`', () => {
+    describe('proxy objects `ResultAsync.combine`', () => {
       interface ITestInterface {
         getName(): string
         setName(name: string): void
         getAsyncResult(): ResultAsync<ITestInterface, Error>
       }
 
-      it('Combines `testdouble` proxies from mocks generated via interfaces', async () => {
+      it('Combines proxy objects from mocks generated via interfaces', async () => {
         const mock = ({} as ITestInterface)
 
         const result = await ResultAsync.combine([okAsync(mock)] as const)
@@ -821,7 +821,7 @@ describe('ResultAsync', () => {
 
     it('rejects if the underlying promise is rejected', () => {
       const asyncResult = new ResultAsync(Promise.reject('oops'))
-      expect(asyncResult).rejects.toBe('oops')
+      return expect(Promise.resolve(asyncResult)).rejects.toBe('oops')
     })
   })
 
@@ -1259,7 +1259,9 @@ describe('ResultAsync', () => {
       const val = await example()
       expect(val.isErr()).toBe(true)
 
-      expect(val._unsafeUnwrapErr()).toEqual(TypeError('Oops: No!'))
+      const unwrapped = val._unsafeUnwrapErr()
+      expect(unwrapped).toBeInstanceOf(Error)
+      expect(unwrapped.message).toBe('Oops: No!')
     })
 
     it('has a top level export', () => {
