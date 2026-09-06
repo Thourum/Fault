@@ -4,7 +4,7 @@
 
 ### retry
 
-`retry<T, E>(fn: () => ResultAsync<T, E>, opts: { times: number; delayMs?: number; when?: (error: E) => boolean }): ResultAsync<T, E>`
+`retry<T, E>(fn: () => ResultAsync<T, E>, opts: { times: number, delayMs?: number, when?: (error: E) => boolean }): ResultAsync<T, E>`
 
 ```ts
 const user = retry(
@@ -19,7 +19,7 @@ const user = retry(
 )
 ```
 
-`times` includes the first attempt, `delayMs` is a fixed delay between attempts and defaults to 0, and `when` defaults to retrying every `Err`.
+The first attempt always runs, even when `times` is 0 or negative; set `times` to at least 1 because it represents the total attempts. `delayMs` is a fixed delay between attempts and defaults to 0, and `when` defaults to retrying every `Err`.
 
 The returned `ResultAsync` resolves to the first `Ok`, the `Err` rejected by `when`, or the last `Err` after all attempts.
 

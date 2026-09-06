@@ -189,7 +189,7 @@ const status = new Fault('missing')
 }
 ```
 
-`toJSON` emits logging-safe fields, serializes `Error` causes, and recursively serializes a cause that is another `Fault`.
+`toJSON` emits structured fields for logging, serializes `Error` causes, and recursively serializes a cause that is another `Fault`; redact sensitive details, metadata, and non-Error causes before logging.
 
 ### getCauseChain
 
@@ -237,40 +237,36 @@ const fault = ServiceError(
 `FaultTag` includes the predefined groups from the source and accepts custom string tags.
 
 ```ts
-// Auth
-'AUTHENTICATION_ERROR'
-'AUTHORIZATION_ERROR'
-
-// Resource
-'NOT_FOUND'
-'DATABASE_ERROR'
-
-// Network/API
-'NETWORK_ERROR'
-'PARSE_ERROR'
-'HTTP_ERROR'
-
-// Data
-'VALIDATION_ERROR'
-'BAD_REQUEST'
-'UNAUTHORIZED'
-'FORBIDDEN'
-'CONFLICT'
-'RATE_LIMITED'
-'PAYMENT_FAILED'
-'EXTERNAL_ERROR'
-'CONFIGURATION_ERROR'
-'CONNECTION_ERROR'
-'UNIQUE_CONSTRAINT_ERROR'
-'FOREIGN_KEY_ERROR'
-'TRANSACTION_ROLLBACK_ERROR'
-
-// Catch-all
-'INTERNAL_ERROR'
-'UNKNOWN_ERROR'
-
-// Custom
-string & {}
+type FaultTag =
+  // Auth
+  | 'AUTHENTICATION_ERROR'
+  | 'AUTHORIZATION_ERROR'
+  // Resource
+  | 'NOT_FOUND'
+  | 'DATABASE_ERROR'
+  // Network/API
+  | 'NETWORK_ERROR'
+  | 'PARSE_ERROR'
+  | 'HTTP_ERROR'
+  // Data
+  | 'VALIDATION_ERROR'
+  | 'BAD_REQUEST'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'CONFLICT'
+  | 'RATE_LIMITED'
+  | 'PAYMENT_FAILED'
+  | 'EXTERNAL_ERROR'
+  | 'CONFIGURATION_ERROR'
+  | 'CONNECTION_ERROR'
+  | 'UNIQUE_CONSTRAINT_ERROR'
+  | 'FOREIGN_KEY_ERROR'
+  | 'TRANSACTION_ROLLBACK_ERROR'
+  // Catch-all
+  | 'INTERNAL_ERROR'
+  | 'UNKNOWN_ERROR'
+  // Custom
+  | (string & {})
 ```
 
 Use a predefined tag when it fits; `string & {}` keeps autocomplete while allowing domain-specific tags.
