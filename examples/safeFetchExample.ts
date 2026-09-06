@@ -1,5 +1,5 @@
-import { safeFetch } from '@itterno/fault/fetch'
-import { safeZodParse } from '@itterno/fault/zod'
+import { safeFetch } from '@thourum/fault/fetch'
+import { safeZodParse } from '@thourum/fault/zod'
 import { z } from 'zod'
 
 const userSchema = z.object({ name: z.string(), age: z.number().min(18) })

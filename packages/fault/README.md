@@ -1,4 +1,4 @@
-# @itterno/fault
+# @thourum/fault
 
 Result types with rich `Fault` errors, built for error tracing. Inspired by [neverthrow](https://github.com/supermacro/neverthrow).
 
@@ -10,15 +10,15 @@ Result types with rich `Fault` errors, built for error tracing. Inspired by [nev
 ## Install
 
 ```sh
-bun add @itterno/fault          # or npm i
-bun add zod                     # only if you use @itterno/fault/zod
-bun add drizzle-orm pg          # only if you use @itterno/fault/drizzle
+npm add @thourum/fault          # or bun add
+npm add zod                     # only if you use @thourum/fault/zod
+npm add drizzle-orm pg          # only if you use @thourum/fault/drizzle
 ```
 
 ## Core
 
 ```ts
-import { ok, err, ResultAsync, Fault, ServiceError, retry } from '@itterno/fault'
+import { ok, err, ResultAsync, Fault, ServiceError, retry } from '@thourum/fault'
 
 Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })
 
@@ -36,11 +36,11 @@ Naming rule: `and*` runs on the Ok path, `or*` on the Err path.
 
 | Import | Exports |
 |---|---|
-| `@itterno/fault/fetch` | `safeFetch(url, init?)` → `ResultAsync<T, Fault>`; 4xx/5xx and network errors become tagged Faults |
-| `@itterno/fault/zod` | `safeZodParse(schema)(data)` / `safeZodParse(schema, data)`, `fromZodError(e)` |
-| `@itterno/fault/drizzle` | `safeDb(promise)`, `DatabaseError(cause)` — pg SQLSTATE → tags like `UNIQUE_CONSTRAINT_ERROR` |
-| `@itterno/fault/pg` | `parsePgError(pgError)` |
-| `@itterno/fault/std` | `safeJsonParse`, `safeJsonStringify`, `safeReadFile`, `safeWriteFile`, `safeEnv` |
+| `@thourum/fault/fetch` | `safeFetch(url, init?)` → `ResultAsync<T, Fault>`; 4xx/5xx and network errors become tagged Faults |
+| `@thourum/fault/zod` | `safeZodParse(schema)(data)` / `safeZodParse(schema, data)`, `fromZodError(e)` |
+| `@thourum/fault/drizzle` | `safeDb(promise)`, `DatabaseError(cause)` — pg SQLSTATE → tags like `UNIQUE_CONSTRAINT_ERROR` |
+| `@thourum/fault/pg` | `parsePgError(pgError)` |
+| `@thourum/fault/std` | `safeJsonParse`, `safeJsonStringify`, `safeReadFile`, `safeWriteFile`, `safeEnv` |
 
 See `examples/payment.ts` and `examples/createPost.ts` for end-to-end flows.
 

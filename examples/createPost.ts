@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { pgTable, text, serial } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { retry, fromPromise, ServiceError } from '@itterno/fault'
-import { safeDb } from '@itterno/fault/drizzle'
-import { safeFetch } from '@itterno/fault/fetch'
-import { safeZodParse } from '@itterno/fault/zod'
+import { retry, fromPromise, ServiceError } from '@thourum/fault'
+import { safeDb } from '@thourum/fault/drizzle'
+import { safeFetch } from '@thourum/fault/fetch'
+import { safeZodParse } from '@thourum/fault/zod'
 
 declare const logger: { warn: (msg: string, data?: unknown) => void }
 declare const bucket: string

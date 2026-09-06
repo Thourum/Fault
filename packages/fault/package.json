@@ -1,5 +1,5 @@
 {
-  "name": "@itterno/fault",
+  "name": "@thourum/fault",
   "version": "0.1.0",
   "description": "Result types with rich Fault errors built for error tracing. Inspired by neverthrow.",
   "type": "module",
@@ -43,5 +43,7 @@
     "zod": "^3.25.76"
   },
   "keywords": ["result", "error-handling", "neverthrow", "fault", "typescript"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/Thourum/Fault.git", "directory": "packages/fault" },
+  "publishConfig": { "access": "public", "provenance": true }
 }

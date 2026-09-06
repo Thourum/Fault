@@ -4,7 +4,7 @@
  * capabilities with secure user communication patterns.
  *
  * @example Using with neverthrow Result types
- * import { err, ok } from '@itterno/fault'
+ * import { err, ok } from '@thourum/fault'
  *
  * function validateUser(data: unknown): Result<User, Fault> {
  *   if (!data) {

@@ -35,7 +35,7 @@ const networkFault = (error: unknown): Fault => {
  * @returns ResultAsync<T, Fault> - Either the parsed response or a Fault error
  *
  * @example Basic GET request
- * import { safeFetch } from '@itterno/fault/fetch'
+ * import { safeFetch } from '@thourum/fault/fetch'
  *
  * const result = await safeFetch<{ id: number; name: string }>('https://api.example.com/users/1')
  *
@@ -66,8 +66,8 @@ const networkFault = (error: unknown): Fault => {
  * )
  *
  * @example Chaining with Zod validation
- * import { okAsync } from '@itterno/fault'
- * import { safeZodParse } from '@itterno/fault/zod'
+ * import { okAsync } from '@thourum/fault'
+ * import { safeZodParse } from '@thourum/fault/zod'
  * import { z } from 'zod'
  *
  * const userSchema = z.object({

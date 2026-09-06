@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@itterno/fault",
+      "name": "@thourum/fault",
       "devDependencies": {
         "@arethetypeswrong/cli": "latest",
         "@types/bun": "latest",

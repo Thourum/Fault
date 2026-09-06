@@ -3,8 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@itterno/fault": ["../packages/fault/src/index.ts"],
-      "@itterno/fault/*": ["../packages/fault/src/*/index.ts"]
+      "@thourum/fault": ["../packages/fault/src/index.ts"],
+      "@thourum/fault/*": ["../packages/fault/src/*/index.ts"]
     },
     "typeRoots": [
       "../packages/fault/node_modules/@types",

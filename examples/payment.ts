@@ -2,10 +2,10 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { ok, err, retry, Fault, ServiceError } from '@itterno/fault'
-import { safeDb } from '@itterno/fault/drizzle'
-import { safeFetch } from '@itterno/fault/fetch'
-import { safeZodParse } from '@itterno/fault/zod'
+import { ok, err, retry, Fault, ServiceError } from '@thourum/fault'
+import { safeDb } from '@thourum/fault/drizzle'
+import { safeFetch } from '@thourum/fault/fetch'
+import { safeZodParse } from '@thourum/fault/zod'
 
 declare const Sentry: { captureException: (e: unknown, ctx?: unknown) => void }
 declare const logger: { info: (msg: string, data?: unknown) => void }

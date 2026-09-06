@@ -1,12 +1,12 @@
 /**
- * @itterno/fault - Production-ready error handling for Node.js and TypeScript
+ * @thourum/fault - Production-ready error handling for Node.js and TypeScript
  *
  * Result types (from neverthrow) plus a Fault error class with rich context.
  * Root exports are core-only. Integrations live on subpaths:
- * `@itterno/fault/fetch`, `/zod`, `/drizzle`, `/pg`, `/std`.
+ * `@thourum/fault/fetch`, `/zod`, `/drizzle`, `/pg`, `/std`.
  *
  * @example Quick start
- * import { ok, err, Result, Fault } from '@itterno/fault'
+ * import { ok, err, Result, Fault } from '@thourum/fault'
  *
  * function greet(name: string): Result<string, Fault> {
  *   if (!name) return err(new Fault('name required').withTag('VALIDATION_ERROR'))
