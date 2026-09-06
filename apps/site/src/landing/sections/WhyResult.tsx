@@ -15,13 +15,15 @@ const POINTS = [
 
 export function WhyResult() {
   return (
-    <section className="mx-auto grid max-w-6xl gap-10 px-6 py-20 md:grid-cols-3">
-      {POINTS.map((p) => (
-        <div key={p.title}>
-          <h3 className="font-mono text-base text-fg">{p.title}</h3>
-          <p className="mt-3 text-sm leading-6 text-muted">{p.body}</p>
-        </div>
-      ))}
+    <section className="mx-auto max-w-6xl px-6 py-24">
+      <dl className="grid gap-x-10 gap-y-12 md:grid-cols-3">
+        {POINTS.map((p) => (
+          <div key={p.title} className="border-t border-fg pt-5">
+            <dt className="text-xl font-medium tracking-tight">{p.title}</dt>
+            <dd className="mt-3 max-w-[38ch] leading-relaxed text-muted">{p.body}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   )
 }

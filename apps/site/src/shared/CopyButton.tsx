@@ -16,7 +16,7 @@ export function CopyButton({ getText }: { getText: () => string }) {
   }
   return (
     <button type="button" onClick={copy} aria-label={copied ? 'Copied' : 'Copy code'} aria-live="polite"
-      className="rounded border border-line px-2 py-1 font-mono text-[11px] text-muted hover:text-fg">
+      className="border border-line bg-surface px-2 py-1 text-xs text-muted hover:border-fg hover:text-fg">
       {copied ? 'copied' : 'copy'}
     </button>
   )

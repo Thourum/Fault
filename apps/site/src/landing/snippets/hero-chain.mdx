@@ -5,7 +5,8 @@ import { safeZodParse } from '@thourum/fault/zod'
 
 Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })
 
-const user = await retry(() => safeFetch('https://api.example.com/me'), { times: 3, delayMs: 200 })
+const me = () => safeFetch('https://api.example.com/me')
+const user = await retry(me, { times: 3, delayMs: 200 })
   .andThen(safeZodParse(userSchema))
   .andThen((u) => (u.active ? ok(u) : err(ServiceError('FORBIDDEN', 'inactive'))))
   .orInspect((f) => f.capture())

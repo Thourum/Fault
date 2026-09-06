@@ -23,15 +23,15 @@ export function Sidebar() {
   }, [])
 
   const list = (
-    <ul className="space-y-1 text-sm">
+    <ul className="border-l border-line text-sm">
       {SECTIONS.map((s) => (
         <li key={s.slug}>
           <a
             href={`#${s.slug}`}
             aria-current={active === s.slug ? 'location' : undefined}
             className={[
-              'block rounded px-2 py-1 font-mono',
-              active === s.slug ? 'bg-surface text-fg' : 'text-muted hover:text-fg',
+              '-ml-px block border-l py-1.5 pl-4',
+              active === s.slug ? 'border-fg font-medium text-fg' : 'border-transparent text-muted hover:text-fg',
             ].join(' ')}
           >
             {s.title}

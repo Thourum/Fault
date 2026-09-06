@@ -16,7 +16,7 @@ export default defineConfig({
       enforce: 'pre',
       ...mdx({
         providerImportSource: '@mdx-js/react',
-        rehypePlugins: [[rehypeShiki, { theme: 'vesper' }]],
+        rehypePlugins: [[rehypeShiki, { theme: 'github-light' }]],
       }),
     },
     react(),
