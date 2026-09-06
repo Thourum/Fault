@@ -175,7 +175,7 @@ const status = new Fault('missing')
   "details": "card_declined: insufficient_funds",
   "tag": "PAYMENT_FAILED",
   "statusCode": 402,
-  "location": "at /Users/samuelasvanyi/.superset/worktrees/58901984-4162-408e-b6b6-d7144964da65/marble-flare/packages/fault/[eval]:1:48",
+  "location": "at chargeUser (src/billing.ts:41:12)",
   "metadata": {
     "intentId": "pi_3Q…",
     "amountCents": 4900
@@ -183,9 +183,9 @@ const status = new Fault('missing')
   "cause": {
     "name": "Error",
     "message": "boom",
-    "stack": "Error: boom\n    at /Users/samuelasvanyi/.superset/worktrees/58901984-4162-408e-b6b6-d7144964da65/marble-flare/packages/fault/[eval]:1:212"
+    "stack": "Error: boom\n    at ..."
   },
-  "stack": "Error: stripe declined\n    at /Users/samuelasvanyi/.superset/worktrees/58901984-4162-408e-b6b6-d7144964da65/marble-flare/packages/fault/[eval]:1:48"
+  "stack": "Error: stripe declined\n    at chargeUser (src/billing.ts:41:12)\n    at ..."
 }
 ```
 

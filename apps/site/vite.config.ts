@@ -7,7 +7,7 @@ import mdx from '@mdx-js/rollup'
 import rehypeShiki from '@shikijs/rehype'
 
 const faultPkg = JSON.parse(
-  readFileSync(resolve(__dirname, '../../packages/fault/package.json'), 'utf8'),
+  readFileSync(resolve(import.meta.dirname, '../../packages/fault/package.json'), 'utf8'),
 )
 
 export default defineConfig({
@@ -26,8 +26,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        docs: resolve(__dirname, 'docs/index.html'),
+        main: resolve(import.meta.dirname, 'index.html'),
+        docs: resolve(import.meta.dirname, 'docs/index.html'),
       },
     },
   },
