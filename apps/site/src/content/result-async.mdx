@@ -56,7 +56,7 @@ Only use `fromSafePromise` for a promise known never to reject.
 
 ### fromAsyncThrowable
 
-`fromAsyncThrowable<A, R, E>(fn: (...args: A) => Promise<R>, errorFn?: (error: unknown) => E): (...args: A) => ResultAsync<R, E>`
+`fromAsyncThrowable<A extends readonly any[], R, E>(fn: (...args: A) => Promise<R>, errorFn?: (error: unknown) => E): (...args: A) => ResultAsync<R, E>`
 
 ```ts
 const loadJson = fromAsyncThrowable(

@@ -167,7 +167,7 @@ const profile = parseUserId(rawId)
 
 ### fromThrowable
 
-`fromThrowable<Fn, E>(fn: Fn, errorFn?: (error: unknown) => E): (...args: Parameters<Fn>) => Result<ReturnType<Fn>, E>`
+`fromThrowable<Fn extends (...args: readonly any[]) => any, E>(fn: Fn, errorFn?: (error: unknown) => E): (...args: Parameters<Fn>) => Result<ReturnType<Fn>, E>`
 
 ```ts
 const parseJson = fromThrowable(
@@ -183,6 +183,8 @@ const config = parseJson(rawConfig)
 
 `safeTry<T, E>(body: () => Generator<Err<never, E>, Result<T, E>>): Result<T, E>`
 
+`safeTry<T, E>(body: () => AsyncGenerator<Err<never, E>, Result<T, E>>): ResultAsync<T, E>`
+
 ```ts
 const total = safeTry(function* () {
   const first = yield* loadAmount('first')
@@ -191,4 +193,4 @@ const total = safeTry(function* () {
 })
 ```
 
-Inside `safeTry`, `yield*` unwraps each `Ok` and returns the first `Err` immediately.
+Inside `safeTry`, `yield*` unwraps each `Ok` and returns the first `Err`; an async generator returns `ResultAsync`.
