@@ -28,6 +28,7 @@ export function Sidebar() {
         <li key={s.slug}>
           <a
             href={`#${s.slug}`}
+            aria-current={active === s.slug ? 'location' : undefined}
             className={[
               'block rounded px-2 py-1 font-mono',
               active === s.slug ? 'bg-surface text-fg' : 'text-muted hover:text-fg',
