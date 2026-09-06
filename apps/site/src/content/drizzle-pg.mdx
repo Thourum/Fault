@@ -1,0 +1,80 @@
+## /drizzle & /pg
+
+`@thourum/fault/drizzle` wraps query promises, while `@thourum/fault/pg` classifies PostgreSQL and Node connection error codes.
+
+### safeDb
+
+`safeDb<T>(dbPromise: Promise<T>): ResultAsync<T, Fault>`
+
+```ts
+const inserted = safeDb(
+  db.insert(posts).values({ authorId, text, imageKey }).returning(),
+)
+```
+
+`safeDb` maps a rejected Drizzle query through `DatabaseError` and leaves successful values unchanged.
+
+**Tags produced:** the tags from `DatabaseError` and `parsePgError`.
+
+### DatabaseError
+
+`DatabaseError(cause: unknown): Fault`
+
+```ts
+const fault = DatabaseError(error)
+```
+
+`DatabaseError` unwraps a PostgreSQL error from a Drizzle error's `cause`, accepts a PostgreSQL error directly, and otherwise returns a `DATABASE_ERROR` labeled for transaction rollback, query, Drizzle, generic `Error`, or unknown failures.
+
+**Tags produced:** `DATABASE_ERROR` or any tag from `parsePgError`.
+
+### isPostgresError
+
+`isPostgresError(error: unknown): error is PgDatabaseError`
+
+```ts
+if (isPostgresError(error)) {
+  return parsePgError(error)
+}
+```
+
+The check is deliberately duck-typed: the value must be an `Error`, contain a `code` property, and have a string `code`, so Node errors such as `ECONNREFUSED` are accepted too.
+
+**Tags produced:** none.
+
+### parsePgError
+
+`parsePgError(error: PgDatabaseError): Fault`
+
+```ts
+try {
+  await db.insert(posts).values(post).returning()
+} catch (error) {
+  const fault = isPostgresError(error)
+    ? parsePgError(error)
+    : DatabaseError(error)
+}
+```
+
+`parsePgError` adds `pgCode`, `pgDetail`, `pgTable`, `pgColumn`, `pgConstraint`, and `pgSchema` metadata, then maps codes as follows.
+
+**Tags produced:** `UNIQUE_CONSTRAINT_ERROR`, `FOREIGN_KEY_ERROR`, `VALIDATION_ERROR`, `DATABASE_ERROR`, `CONNECTION_ERROR`, or `TRANSACTION_ROLLBACK_ERROR`.
+
+| SQLSTATE or error code | Tag |
+| --- | --- |
+| `23505` | `UNIQUE_CONSTRAINT_ERROR` |
+| `23503` | `FOREIGN_KEY_ERROR` |
+| `23502` | `VALIDATION_ERROR` |
+| `23514` | `VALIDATION_ERROR` |
+| `42P01` | `DATABASE_ERROR` |
+| `42703` | `DATABASE_ERROR` |
+| `57014` | `DATABASE_ERROR` |
+| `ECONNREFUSED` | `CONNECTION_ERROR` |
+| `ENOTFOUND` | `CONNECTION_ERROR` |
+| `ETIMEDOUT` | `CONNECTION_ERROR` |
+| `40001` | `TRANSACTION_ROLLBACK_ERROR` |
+| `40P01` | `TRANSACTION_ROLLBACK_ERROR` |
+| Any other code beginning with `08` | `CONNECTION_ERROR` |
+| Every other code | `DATABASE_ERROR` |
+
+Unique, foreign-key, and not-null faults also include the inferred field in metadata when available.
