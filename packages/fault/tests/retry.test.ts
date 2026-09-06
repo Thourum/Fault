@@ -38,4 +38,7 @@ describe('retry', () => {
     expect(r).toBeInstanceOf(ResultAsync)
     expect((await r.map((v) => v + 1))._unsafeUnwrap()).toBe(43)
   })
+  it('rejects when fn throws synchronously', async () => {
+    await expect(Promise.resolve(retry(() => { throw new Error('x') }, { times: 2 }))).rejects.toThrow('x')
+  })
 })

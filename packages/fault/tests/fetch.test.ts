@@ -49,6 +49,13 @@ describe('safeFetch', () => {
     stub(200, '{"a":1}', { 'content-type': 'Application/JSON; charset=utf-8' })
     expect((await safeFetch<{ a: number }>('http://x'))._unsafeUnwrap()).toEqual({ a: 1 })
   })
+  it.each([
+    ['application/problem+json'],
+    ['application/vnd.api+json; charset=utf-8'],
+  ])('parses JSON for structured-suffix type %s', async (contentType) => {
+    stub(200, '{"a":1}', { 'content-type': contentType })
+    expect((await safeFetch<{ a: number }>('http://x'))._unsafeUnwrap()).toEqual({ a: 1 })
+  })
   it.each([200, 500])('NETWORK_ERROR when body read rejects (status %i)', async (status) => {
     const boom = new Error('body stream broke')
     globalThis.fetch = (async () => {

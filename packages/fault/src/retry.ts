@@ -12,7 +12,10 @@ export interface RetryOptions<E> {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-/** Re-run `fn` while it returns Err (and `when(err)` holds), up to `times` attempts. */
+/**
+ * Re-run `fn` while it returns Err (and `when(err)` holds), up to `times` attempts.
+ * `fn` must return a ResultAsync and must not throw synchronously; wrap with `ResultAsync.fromThrowable` if it can.
+ */
 export function retry<T, E>(fn: () => ResultAsync<T, E>, opts: RetryOptions<E>): ResultAsync<T, E> {
     const { times, delayMs = 0, when = () => true } = opts
     const run = async (): Promise<Result<T, E>> => {

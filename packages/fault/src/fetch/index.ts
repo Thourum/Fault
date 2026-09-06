@@ -172,9 +172,8 @@ export function safeFetch<T = unknown>(
         }
 
         return ResultAsync.fromPromise(response.text(), networkFault).andThen((text) => {
-            const isJson = (response.headers.get('content-type') ?? '')
-                .toLowerCase()
-                .includes('application/json');
+            const mediaType = (response.headers.get('content-type') ?? '').split(';')[0]!.trim();
+            const isJson = /^application\/([\w.-]+\+)?json\b/i.test(mediaType);
             if (response.status === 204 || !isJson || text === '') {
                 return okAsync(undefined as T);
             }
