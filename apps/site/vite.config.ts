@@ -10,8 +10,16 @@ const faultPkg = JSON.parse(
   readFileSync(resolve(import.meta.dirname, '../../packages/fault/package.json'), 'utf8'),
 )
 
+// skills/*/SKILL.md carry YAML frontmatter for agent tooling; drop it before MDX sees the file.
+const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n/
+
 export default defineConfig({
   plugins: [
+    {
+      name: 'strip-skill-frontmatter',
+      enforce: 'pre',
+      transform: (code, id) => (id.endsWith('/SKILL.md') ? code.replace(FRONTMATTER, '') : null),
+    },
     {
       enforce: 'pre',
       ...mdx({
@@ -23,6 +31,13 @@ export default defineConfig({
     tailwindcss(),
   ],
   define: { __FAULT_VERSION__: JSON.stringify(faultPkg.version) },
+  // SKILL.md files live outside this package; resolve MDX's runtime imports from here.
+  resolve: {
+    alias: {
+      'react/jsx-runtime': resolve(import.meta.dirname, 'node_modules/react/jsx-runtime.js'),
+      '@mdx-js/react': resolve(import.meta.dirname, 'node_modules/@mdx-js/react/index.js'),
+    },
+  },
   build: {
     rollupOptions: {
       input: {

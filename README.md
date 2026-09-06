@@ -44,6 +44,16 @@ const user = await retry(() => safeFetch('https://api.example.com/me'), { times:
 
 Zero runtime dependencies; `zod`, `drizzle-orm`, `pg` are optional peers. See [`packages/fault`](packages/fault) and [`examples/`](examples).
 
+## Agent skills
+
+`skills/` holds `SKILL.md` files for coding agents (Claude Code, Cursor, Codex, …): `fault-error-handling`, `fault-from-try-catch`, `fault-from-neverthrow`.
+
+```sh
+npx skills add Thourum/Fault
+```
+
+They are also rendered at [fault.itterno.dev/docs/#agents](https://fault.itterno.dev/docs/#agents).
+
 ## Develop
 
 ```sh

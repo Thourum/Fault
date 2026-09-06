@@ -31,6 +31,10 @@ pre.shiki code { font-family: var(--font-mono); }
 .prose { @apply leading-7; }
 .prose h2 { @apply mt-20 mb-4 text-3xl font-semibold tracking-tight scroll-mt-24; }
 .prose h3 { @apply mt-10 mb-3 text-xl font-medium scroll-mt-24; }
+.prose h4 { @apply mt-8 mb-2 text-base font-medium scroll-mt-24; }
+.prose h5 { @apply mt-6 mb-2 text-sm font-medium text-muted scroll-mt-24; }
+.prose ol { @apply my-4 list-decimal pl-6 text-muted; }
+.prose li { @apply my-1; }
 .prose p  { @apply my-4 max-w-[68ch] text-muted; }
 .prose a  { @apply text-fg underline decoration-line underline-offset-4 hover:decoration-fg; }
 .prose code:not(pre code) { @apply bg-surface border border-line px-1.5 py-0.5 font-mono text-[0.85em] text-fg; }

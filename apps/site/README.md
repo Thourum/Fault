@@ -12,6 +12,8 @@ bun run local-ci   # typecheck, build, smoke
 
 Docs content lives in `src/content/*.mdx`, one file per section, ordered in `src/docs/sections.ts`. Every sample must match `packages/fault/src`.
 
+The "For AI agents" section renders the repo's `skills/*/SKILL.md` files directly (`src/docs/SkillList.tsx`); a small Vite plugin strips their YAML frontmatter. Edit the skill, not the site.
+
 ## Deploy (Cloudflare Workers, static assets)
 
 ```sh
