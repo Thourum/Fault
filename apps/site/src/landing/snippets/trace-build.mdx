@@ -1,0 +1,9 @@
+```ts
+err(
+  new Fault('stripe declined')
+    .withTag('PAYMENT_FAILED')
+    .withDetails('card_declined: insufficient_funds')
+    .withMetadata({ intentId: 'pi_3Q…', amountCents: 4900 })
+    .withCause(stripeError),
+)
+```

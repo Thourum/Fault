@@ -1,0 +1,20 @@
+```json
+{
+  "name": "Error",
+  "message": "stripe declined",
+  "tag": "PAYMENT_FAILED",
+  "details": "card_declined: insufficient_funds",
+  "statusCode": 402,
+  "location": "at chargeUser (src/billing.ts:41:12)",
+  "metadata": {
+    "intentId": "pi_3Q…",
+    "amountCents": 4900
+  },
+  "cause": {
+    "name": "StripeCardError",
+    "message": "Your card has insufficient funds.",
+    "stack": "StripeCardError: Your card has insufficient funds.\n    at ..."
+  },
+  "stack": "Error: stripe declined\n    at chargeUser (src/billing.ts:41:12)\n    at ..."
+}
+```
