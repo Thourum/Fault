@@ -4,7 +4,10 @@
 
 ### safeZodParse
 
-`safeZodParse<S extends ZodSchema>(schema: S): (data: unknown) => Result<z.infer<S>, Fault>` / `safeZodParse<S extends ZodSchema>(schema: S, data: unknown): Result<z.infer<S>, Fault>`
+```ts
+safeZodParse<S extends ZodSchema>(schema: S): (data: unknown) => Result<z.infer<S>, Fault>
+safeZodParse<S extends ZodSchema>(schema: S, data: unknown): Result<z.infer<S>, Fault>
+```
 
 ```ts
 const parsed = safeZodParse(userSchema, JSON.parse(text))
@@ -12,7 +15,7 @@ const parseUser = safeZodParse(userSchema)
 const parsedLater = parseUser(input)
 ```
 
-Use the direct form for one value or the curried form when the same schema validates multiple values; validation failures are converted with `fromZodError`.
+Use the direct form for one defined value or the curried form when the same schema validates multiple values; validation failures are converted with `fromZodError`. Passing `data === undefined` selects the curried form and returns a parser, not a `Result`.
 
 **Tag produced:** `VALIDATION_ERROR`.
 
