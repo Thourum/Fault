@@ -1,0 +1,119 @@
+## ResultAsync
+
+`ResultAsync<T, E>` is a thenable wrapper around `Promise<Result<T, E>>`; `await` returns the `Result`, not the inner `T`.
+
+### await
+
+`await resultAsync: Result<T, E>`
+
+```ts
+const result = await loadUser('usr_123')
+
+if (result.isErr()) {
+  result.error.capture()
+}
+```
+
+Await a `ResultAsync` when you need to inspect or match its concrete `Result`.
+
+### okAsync / errAsync
+
+`okAsync<T, E = never>(value: T): ResultAsync<T, E>` / `errAsync<T = never, E = unknown>(error: E): ResultAsync<T, E>`
+
+```ts
+const cached = okAsync({ id: 'usr_123' })
+const failed = errAsync(
+  new Fault('cache unavailable').withTag('CONNECTION_ERROR'),
+)
+```
+
+Use these helpers when an asynchronous chain already has a success or failure value.
+
+### fromPromise
+
+`fromPromise<T, E>(promise: PromiseLike<T>, errorFn: (error: unknown) => E): ResultAsync<T, E>`
+
+```ts
+const user = fromPromise(
+  fetch('/api/user').then((response) => response.json()),
+  (e) => Fault.from(e as Error).withTag('NETWORK_ERROR'),
+)
+```
+
+`fromPromise` maps a rejected promise to `Err`; use `fromAsyncThrowable` when invoking the function could also throw synchronously.
+
+### fromSafePromise
+
+`fromSafePromise<T, E = never>(promise: PromiseLike<T>): ResultAsync<T, E>`
+
+```ts
+const settings = fromSafePromise(
+  Promise.resolve({ theme: 'system' }),
+)
+```
+
+Only use `fromSafePromise` for a promise known never to reject.
+
+### fromAsyncThrowable
+
+`fromAsyncThrowable<A, R, E>(fn: (...args: A) => Promise<R>, errorFn?: (error: unknown) => E): (...args: A) => ResultAsync<R, E>`
+
+```ts
+const loadJson = fromAsyncThrowable(
+  async (url: string) => (await fetch(url)).json(),
+  (error) => Fault.from(error as Error).withTag('NETWORK_ERROR'),
+)
+
+const user = loadJson('/api/user')
+```
+
+`fromAsyncThrowable` catches both synchronous throws during invocation and promise rejections.
+
+### andThen
+
+`andThen<U, F>(f: (value: T) => Result<U, F> | ResultAsync<U, F>): ResultAsync<U, E | F>`
+
+```ts
+const user = loadSession()
+  .andThen((session) => validateSession(session))
+  .andThen((session) => loadUser(session.userId))
+```
+
+`andThen` accepts either a synchronous `Result` or another `ResultAsync` and skips the callback on `Err`.
+
+### map
+
+`map<A>(f: (value: T) => A | Promise<A>): ResultAsync<A, E>`
+
+```ts
+const displayName = loadUser('usr_123')
+  .map(async (user) => formatDisplayName(user))
+  .orInspect((fault) => fault.capture())
+```
+
+`map` accepts a synchronous or asynchronous transform and leaves an `Err` untouched.
+
+### match
+
+`match<A, B = A>(ok: (value: T) => A, err: (error: E) => B): Promise<A | B>`
+
+```ts
+const message = await loadUser('usr_123').match(
+  (user) => `hello ${user.name}`,
+  (fault) => `failed: ${fault.message}`,
+)
+```
+
+`match` handles both variants and resolves to the selected callback's value.
+
+### then
+
+`then<A, B>(success?: (result: Result<T, E>) => A | PromiseLike<A>, failure?: (reason: unknown) => B | PromiseLike<B>): PromiseLike<A | B>`
+
+```ts
+loadUser('usr_123').then((result) =>
+  result.match(renderUser, renderFault),
+)
+```
+
+`.then` receives the resolved `Result`, which lets `ResultAsync` interoperate with promise-based APIs.

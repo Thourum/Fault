@@ -1,0 +1,40 @@
+## Getting started
+
+### Install
+
+Install the dependency for each import path you use.
+
+```ts
+npm add @thourum/fault
+npm add zod
+npm add drizzle-orm pg
+```
+
+The core package has no runtime dependencies; `zod` is only needed for `@thourum/fault/zod`, and `drizzle-orm pg` only for `@thourum/fault/drizzle`.
+
+### Your first Result
+
+```ts
+import { ok, err, type Result, Fault } from '@thourum/fault'
+
+function parsePort(raw: string): Result<number, Fault> {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    return err(new Fault(`invalid port: ${raw}`).withTag('VALIDATION_ERROR'))
+  }
+  return ok(n)
+}
+
+parsePort(process.env.PORT ?? '').match(
+  (port) => listen(port),
+  (fault) => fault.capture(),
+)
+```
+
+A function that can fail returns `Result<T, Fault>` instead of throwing.
+
+### Mental model
+
+- `Result` is synchronous; `ResultAsync` is a thenable whose awaited value is a `Result`.
+- `and*` methods run on `Ok`; `or*` methods run on `Err`.
+- `Fault` is the only error type you should ever put in `E`.
