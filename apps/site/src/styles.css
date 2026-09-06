@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: oklch(0.14 0.005 260);
+  --color-surface: oklch(0.18 0.006 260);
+  --color-line: oklch(0.28 0.008 260);
+  --color-fg: oklch(0.93 0.01 80);
+  --color-muted: oklch(0.65 0.01 260);
+  --color-accent: oklch(0.80 0.16 75);
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+:root { color-scheme: dark; }
+html { background: var(--color-bg); color: var(--color-fg); font-family: var(--font-sans); }
+
+/* Shiki emits inline colors; keep container styling ours */
+pre.shiki { @apply rounded-lg border border-line bg-surface! p-4 text-sm leading-relaxed overflow-x-auto; }
+pre.shiki code { font-family: var(--font-mono); }
+
+.prose { @apply text-fg/90 leading-7; }
+.prose h2 { @apply mt-14 mb-4 text-2xl font-semibold tracking-tight scroll-mt-24; }
+.prose h3 { @apply mt-10 mb-3 text-lg font-medium scroll-mt-24; }
+.prose p  { @apply my-4 text-muted; }
+.prose a  { @apply text-accent underline-offset-4 hover:underline; }
+.prose code:not(pre code) { @apply rounded bg-surface px-1.5 py-0.5 font-mono text-[0.9em] text-fg; }
+.prose pre { @apply my-5; }
+.prose table { @apply my-6 w-full text-sm; }
+.prose th { @apply border-b border-line py-2 text-left font-medium; }
+.prose td { @apply border-b border-line/60 py-2 pr-4 align-top text-muted; }
+.prose ul { @apply my-4 list-disc pl-6 text-muted; }
