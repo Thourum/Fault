@@ -93,6 +93,49 @@ const displayName = loadUser('usr_123')
 
 `map` accepts a synchronous or asynchronous transform and leaves an `Err` untouched.
 
+### mapErr
+
+`mapErr<U>(f: (error: E) => U | Promise<U>): ResultAsync<T, U>`
+
+```ts
+const user = loadUser('usr_123')
+  .mapErr((fault) => Fault.from(fault).withTag('EXTERNAL_ERROR'))
+```
+
+`mapErr` transforms an `Err` value and leaves an `Ok` untouched.
+
+### andCheck
+
+`andCheck<F>(f: (value: T) => Result<unknown, F> | ResultAsync<unknown, F>): ResultAsync<T, E | F>`
+
+```ts
+const user = loadUser('usr_123')
+  .andCheck((value) => validateUserAsync(value))
+```
+
+`andCheck` runs a synchronous or asynchronous check while preserving the original `Ok` value.
+
+### orElse
+
+`orElse<U, F>(f: (error: E) => Result<U, F> | ResultAsync<U, F>): ResultAsync<T | U, F>`
+
+```ts
+const user = loadUser('usr_123')
+  .orElse(() => okAsync({ id: 'fallback' }))
+```
+
+`orElse` recovers an `Err` with a synchronous or asynchronous fallback result.
+
+### unwrapOr
+
+`unwrapOr<A>(fallback: A): Promise<T | A>`
+
+```ts
+const user = await loadUser('usr_123').unwrapOr({ id: 'anonymous' })
+```
+
+`unwrapOr` resolves to the `Ok` value or the fallback when the result is an `Err`.
+
 ### match
 
 `match<A, B = A>(ok: (value: T) => A, err: (error: E) => B): Promise<A | B>`

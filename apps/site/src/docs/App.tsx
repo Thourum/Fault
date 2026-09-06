@@ -13,6 +13,7 @@ export function App() {
         <Sidebar />
         <MDXProvider components={mdxComponents}>
           <main className="prose min-w-0 max-w-3xl">
+            <h1 className="sr-only">fault docs</h1>
             {SECTIONS.map(({ slug, Component }) => (
               <section key={slug} id={slug} className="scroll-mt-24">
                 <Component />

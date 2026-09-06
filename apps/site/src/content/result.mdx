@@ -30,6 +30,32 @@ if (result.isOk()) {
 
 Use these type guards when control flow needs the concrete variant.
 
+### Result.combine
+
+`Result.combine(resultList: readonly Result<unknown, unknown>[]): Result<unknown[], unknown>`
+
+```ts
+const user = Result.combine([
+  parseUserId(rawId),
+  parsePreferences(rawId),
+])
+```
+
+`Result.combine` returns all `Ok` values or short-circuits with the first `Err`.
+
+### Result.combineWithAllErrors
+
+`Result.combineWithAllErrors(resultList: readonly Result<unknown, unknown>[]): Result<unknown[], unknown[]>`
+
+```ts
+const checks = Result.combineWithAllErrors([
+  validateEmail(email),
+  validatePassword(password),
+])
+```
+
+`Result.combineWithAllErrors` collects every `Err` instead of stopping at the first one.
+
 ### map
 
 `map<A>(f: (value: T) => A): Result<A, E>`
@@ -152,6 +178,17 @@ const user = parseUserId(rawId)
 ```
 
 Use `asyncAndThen` to continue a synchronous `Result` with a fallible asynchronous computation.
+
+### asyncAndCheck
+
+`asyncAndCheck<F>(f: (value: T) => ResultAsync<unknown, F>): ResultAsync<T, E | F>`
+
+```ts
+const user = parseUser(rawUser)
+  .asyncAndCheck((value) => validateUserAsync(value))
+```
+
+`asyncAndCheck` runs an asynchronous check while preserving the original `Ok` value when it succeeds.
 
 ### asyncMap
 

@@ -10,7 +10,7 @@
 const fault = new Fault(new Error('stripe declined'))
 ```
 
-A new fault keeps the input message and cause, records its construction location, and starts with the `UNKNOWN_ERROR` tag.
+A new fault keeps the input message and forwards only the input error's existing `cause`; use `.withCause(err)` to attach the original error itself.
 
 ### Fault.from
 

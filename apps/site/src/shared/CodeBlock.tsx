@@ -10,7 +10,7 @@ export function CodeBlock({ 'data-filename': filename, className, ...rest }: Pro
       {filename && (
         <div className="absolute left-3 top-2 font-mono text-[11px] text-muted">{filename}</div>
       )}
-      <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         <CopyButton getText={() => ref.current?.textContent ?? ''} />
       </div>
       <pre ref={ref} className={[className, filename ? 'pt-8!' : ''].join(' ')} {...rest} />
