@@ -1,8 +1,6 @@
-# vendored reference repos (nested git clones, not part of this project)
-examples/effect/
-examples/neverthrow/
-
-# SDD working files
+# agent working files
+.claude/
 .superpowers/
+docs/superpowers/
 
 .DS_Store
