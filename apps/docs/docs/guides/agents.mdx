@@ -1,0 +1,26 @@
+---
+title: "For AI agents"
+description: "Install the fault skills so Claude Code, Cursor, Codex and other coding agents write and migrate code with this library correctly."
+---
+
+# For AI agents
+
+fault ships three agent skills: short, example-dense instructions in the open `SKILL.md` format. They live in [`skills/`](https://github.com/Thourum/Fault/tree/main/skills) and one command installs them into whichever agent you use.
+
+```sh
+npx skills add Thourum/Fault
+```
+
+Pick a single skill with `--skill`:
+
+```sh
+npx skills add Thourum/Fault --skill fault-error-handling
+```
+
+| Skill | Use when |
+|---|---|
+| [fault-error-handling](/guides/skills/fault-error-handling) | Writing new functions: signatures, tags, chaining, where to capture. |
+| [fault-from-try-catch](/guides/skills/fault-from-try-catch) | Migrating throwing code and `try`/`catch` to `Result` and `ResultAsync`. |
+| [fault-from-neverthrow](/guides/skills/fault-from-neverthrow) | Moving a codebase from `neverthrow` to fault. |
+
+Each page shows the same file the agent reads.

@@ -1,0 +1,44 @@
+/* Same drafting-paper identity as apps/site: cool grey ground, ink text, Err red as brand. */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  --rp-c-brand: #c2371f;
+  --rp-c-brand-light: #d95a42;
+  --rp-c-brand-lighter: #f2c9c0;
+  --rp-c-brand-dark: #a02c17;
+  --rp-c-brand-darker: #7e2211;
+  --rp-c-brand-tint: rgba(194, 55, 31, 0.1);
+
+  --rp-c-bg: #f2f4f7;
+  --rp-c-bg-soft: #e9ecf1;
+  --rp-c-bg-mute: #e1e5eb;
+  --rp-c-text-1: #141f2b;
+  --rp-c-text-2: #4a5665;
+  --rp-c-divider: #c4ccd6;
+  --rp-c-divider-light: #d6dce4;
+
+  --rp-c-bg-alt: #f8f9fb;
+  --ld-ok: #1e7a4b;
+  --rp-radius: 0;
+  --rp-radius-small: 0;
+  --rp-radius-large: 0;
+}
+
+html.rp-dark {
+  --rp-c-brand: #ff7a5c;
+  --rp-c-brand-light: #ff9a82;
+  --rp-c-brand-dark: #e0603f;
+  --rp-c-bg: #0e1726;
+  --rp-c-bg-soft: #15203a;
+  --rp-c-bg-mute: #1b2745;
+  --rp-c-text-1: #ede9e0;
+  --rp-c-text-2: #a7b0c0;
+  --rp-c-divider: #2a3a56;
+  --rp-c-divider-light: #22304a;
+  --ld-ok: #7fdda6;
+}
+
+html { font-optical-sizing: auto; }
+body { font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; }
+code, kbd, pre, samp { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace; }
+h1, h2, h3 { text-wrap: balance; letter-spacing: -0.02em; }

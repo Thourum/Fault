@@ -1,0 +1,77 @@
+/* Landing page. Tokens come from theme/styles.css; --ld-* are landing-only metrics. */
+.ld {
+  --ld-code-pad: 1.25rem;
+  --ld-code-lh: 1.6rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 6rem 1.5rem 5rem;
+  color: var(--rp-c-text-1);
+}
+.ld-last { padding-bottom: 7rem; }
+.ld-band { max-width: none; padding: 0; border-top: 1px solid var(--rp-c-divider); border-bottom: 1px solid var(--rp-c-divider); background: var(--rp-c-bg-alt); }
+.ld-inner { max-width: 72rem; margin: 0 auto; padding: 6rem 1.5rem; }
+
+.ld-h1 { max-width: 48rem; font-size: clamp(2.75rem, 7vw, 5.5rem); font-weight: 600; line-height: 0.98; letter-spacing: -0.03em; text-wrap: balance; }
+.ld-h2 { font-size: 2.25rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em; text-wrap: balance; }
+.ld-lead { max-width: 52ch; font-size: 1.125rem; line-height: 1.6; color: var(--rp-c-text-2); }
+.ld-lead code, .ld-table code { font-size: 0.9em; color: var(--rp-c-text-1); background: none; padding: 0; border: 0; }
+.ld-muted { color: var(--rp-c-text-2); }
+.ld-err { color: var(--rp-c-brand); }
+.ld-caption { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--rp-c-text-2); }
+
+.ld-hero-grid { display: grid; gap: 2.5rem; margin-top: 2.5rem; }
+.ld-split { display: grid; gap: 1.5rem; }
+@media (min-width: 1024px) {
+  .ld-hero-grid { grid-template-columns: minmax(0, 22rem) 1fr; gap: 4rem; }
+  .ld-split { grid-template-columns: minmax(0, 22rem) 1fr; gap: 4rem; }
+}
+
+.ld-install { display: flex; align-items: center; gap: 0.75rem; margin-top: 2rem; padding: 0.75rem 1rem; border: 1px solid var(--rp-c-text-1); background: var(--rp-c-bg-alt); font-family: 'Geist Mono', ui-monospace, monospace; font-size: 0.875rem; }
+.ld-copy { margin-left: auto; padding: 0.25rem 0.5rem; border: 1px solid var(--rp-c-divider); background: var(--rp-c-bg-alt); font: inherit; font-size: 0.75rem; color: var(--rp-c-text-2); cursor: pointer; }
+.ld-copy:hover { border-color: var(--rp-c-text-1); color: var(--rp-c-text-1); }
+.ld-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
+.ld-btn { padding: 0.5rem 1rem; border: 1px solid var(--rp-c-divider); font-size: 0.875rem; color: var(--rp-c-text-1); text-decoration: none; }
+.ld-btn:hover { border-color: var(--rp-c-text-1); }
+.ld-btn-primary { border-color: var(--rp-c-text-1); background: var(--rp-c-text-1); color: var(--rp-c-bg); font-weight: 500; }
+.ld-btn-primary:hover { opacity: 0.85; }
+
+/* Code blocks inside the landing: fixed metrics so the rail lines up with lines. */
+.ld-code { min-width: 0; }
+.ld-code pre { margin: 0; padding: var(--ld-code-pad); border: 1px solid var(--rp-c-divider); background: var(--rp-c-bg-alt); line-height: var(--ld-code-lh); font-size: 0.875rem; overflow-x: auto; }
+.ld-code .rp-codeblock { margin: 0; border: 0; }
+.ld-code .rp-code-button-group { display: none; }
+
+.ld-rail-wrap { position: relative; margin: 0; min-width: 0; }
+.ld-rail { display: none; position: absolute; top: 0; left: 0; height: 100%; width: 2rem; margin: 0; padding: var(--ld-code-pad) 0; list-style: none; }
+.ld-rail-line { display: flex; align-items: center; height: var(--ld-code-lh); }
+.ld-tick { display: inline-block; width: 0.5rem; height: 1px; background: var(--rp-c-divider); }
+.ld-tick-ok { width: 1.5rem; height: 2px; background: var(--ld-ok); }
+.ld-tick-err { width: 1.5rem; height: 2px; background: var(--rp-c-brand); }
+.ld-legend { display: flex; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.875rem; color: var(--rp-c-text-2); }
+.ld-legend span { display: inline-flex; align-items: center; gap: 0.5rem; }
+@media (min-width: 1024px) {
+  .ld-rail-wrap { padding-left: 2rem; }
+  .ld-rail { display: block; }
+}
+
+.ld-trace { display: grid; gap: 2rem; margin-top: 3.5rem; }
+.ld-links { display: none; align-self: center; margin: 0; padding: 0; list-style: none; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 0.75rem; }
+.ld-links li { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; }
+.ld-link-line { width: 3rem; height: 1px; background: color-mix(in oklab, var(--rp-c-brand) 50%, transparent); }
+@media (min-width: 1024px) {
+  .ld-trace { grid-template-columns: 1fr auto 1.2fr; gap: 1.5rem; }
+  .ld-links { display: block; }
+}
+
+.ld-why { display: grid; gap: 3rem 2.5rem; margin: 0; }
+@media (min-width: 768px) { .ld-why { grid-template-columns: repeat(3, 1fr); } }
+.ld-why > div { border-top: 1px solid var(--rp-c-text-1); padding-top: 1.25rem; }
+.ld-why dt { font-size: 1.25rem; font-weight: 500; letter-spacing: -0.01em; }
+.ld-why dd { margin: 0.75rem 0 0; max-width: 38ch; line-height: 1.6; color: var(--rp-c-text-2); }
+
+.ld-table { width: 100%; margin-top: 3rem; border-collapse: collapse; font-size: 0.875rem; }
+.ld-table th { padding: 0.5rem 1rem 0.5rem 0; border-bottom: 1px solid var(--rp-c-text-1); text-align: left; font-weight: 500; }
+.ld-table td { padding: 0.75rem 1rem 0.75rem 0; border-bottom: 1px solid var(--rp-c-divider); vertical-align: top; }
+.ld-table td:first-child { white-space: nowrap; }
+.ld-table a { color: var(--rp-c-text-1); text-decoration: underline; text-decoration-color: var(--rp-c-divider); text-underline-offset: 4px; }
+.ld-table a:hover { text-decoration-color: var(--rp-c-text-1); }

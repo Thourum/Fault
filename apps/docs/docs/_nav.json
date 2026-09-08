@@ -1,0 +1,4 @@
+[
+  { "text": "Docs", "link": "/getting-started", "activeMatch": "^/(getting-started|core|integrations|guides)" },
+  { "text": "npm", "link": "https://www.npmjs.com/package/@thourum/fault" }
+]

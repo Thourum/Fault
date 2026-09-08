@@ -1,0 +1,36 @@
+---
+title: "/fetch"
+description: "@thourum/fault/fetch turns native fetch failures, HTTP errors, and JSON parse failures into ResultAsync values."
+---
+
+# /fetch
+
+@thourum/fault/fetch turns native fetch failures, HTTP errors, and JSON parse failures into ResultAsync values.
+
+## safeFetch
+
+`safeFetch<T = unknown>(input: URL | string, init?: RequestInit): ResultAsync<T, Fault>`
+
+```ts
+const result = await safeFetch<unknown>('/api/user')
+
+result
+  .andThen((data) => safeZodParse(userSchema, data))
+  .match(showUser, showFault)
+```
+
+A successful response parses `application/json` and `application/*+json` bodies, while a `204`, an empty body, or another media type returns `undefined`; thrown requests become `NETWORK_ERROR`, invalid successful JSON becomes `PARSE_ERROR`, and non-OK responses use the table below.
+
+**Tags produced:** `NETWORK_ERROR`, `PARSE_ERROR`, `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `RATE_LIMITED`, or `INTERNAL_ERROR`.
+
+| HTTP status | Tag |
+| --- | --- |
+| `400` | `BAD_REQUEST` |
+| `401` | `UNAUTHORIZED` |
+| `403` | `FORBIDDEN` |
+| `404` | `NOT_FOUND` |
+| `429` | `RATE_LIMITED` |
+| `500` and above | `INTERNAL_ERROR` |
+| Every other non-OK status | `BAD_REQUEST` |
+
+HTTP faults include `httpStatus`, `httpStatusText`, `httpHeaders`, and `httpBody` metadata. The body is parsed as JSON when possible and otherwise kept as text.

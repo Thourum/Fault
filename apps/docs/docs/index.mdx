@@ -1,0 +1,63 @@
+---
+pageType: custom
+title: fault
+titleSuffix: Result types with traceable errors
+description: Result<T, Fault> for TypeScript. Every failure carries tag, details, location, metadata and cause — built for Sentry and OTel.
+---
+
+import { Hero, Rail, Install, Trace, Why, Subpaths } from '@theme/landing'
+
+<Hero>
+  <Install command="bun add @thourum/fault" />
+  <Rail ok={[9, 10]} err={[11]} lines={11}>
+```ts
+import { ok, err, retry, Fault, ServiceError } from '@thourum/fault'
+import { safeFetch } from '@thourum/fault/fetch'
+import { safeZodParse } from '@thourum/fault/zod'
+
+Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })
+
+const me = () => safeFetch('https://api.example.com/me')
+const user = await retry(me, { times: 3, delayMs: 200 })
+  .andThen(safeZodParse(userSchema))
+  .andThen((u) => (u.active ? ok(u) : err(ServiceError('FORBIDDEN', 'inactive'))))
+  .orInspect((f) => f.capture())
+```
+  </Rail>
+</Hero>
+
+<Trace>
+```ts
+err(
+  new Fault('stripe declined')
+    .withTag('PAYMENT_FAILED')
+    .withDetails('card_declined: insufficient_funds')
+    .withMetadata({ intentId: 'pi_3Q…', amountCents: 4900 })
+    .withCause(stripeError),
+)
+```
+```json
+{
+  "name": "Error",
+  "message": "stripe declined",
+  "tag": "PAYMENT_FAILED",
+  "details": "card_declined: insufficient_funds",
+  "statusCode": 402,
+  "location": "at chargeUser (src/billing.ts:41:12)",
+  "metadata": {
+    "intentId": "pi_3Q…",
+    "amountCents": 4900
+  },
+  "cause": {
+    "name": "StripeCardError",
+    "message": "Your card has insufficient funds.",
+    "stack": "StripeCardError: Your card has insufficient funds.\n    at ..."
+  },
+  "stack": "Error: stripe declined\n    at chargeUser (src/billing.ts:41:12)\n    at ..."
+}
+```
+</Trace>
+
+<Why />
+
+<Subpaths />

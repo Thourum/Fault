@@ -1,0 +1,18 @@
+{
+  "name": "fault-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-skills": "bun scripts/sync-skills.ts",
+    "check-skills": "bun run sync-skills && git diff --exit-code -- docs/guides/skills",
+    "dev": "rspress dev",
+    "build": "rspress build",
+    "preview": "rspress preview",
+    "local-ci": "bun run check-skills && bun run build",
+    "deploy": "bun run build && bun x wrangler deploy"
+  },
+  "devDependencies": {
+    "@rspress/core": "^2.0.21",
+    "@types/bun": "^1.4.2"
+  }
+}

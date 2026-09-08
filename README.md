@@ -12,7 +12,7 @@
   <a href="https://bun.sh"><img alt="bun" src="https://shieldcn.dev/badge/runtime-bun-000.svg?variant=secondary&logo=bun" /></a>
 </p>
 
-Docs and site: https://fault.itterno.dev (source in [`apps/site`](apps/site)).
+Docs and site: https://fault.itterno.dev (source in [`apps/docs`](apps/docs)).
 
 `Result<T, Fault>` everywhere. A `Fault` carries tag, details, location, metadata and `cause`, and serialises with `toJSON()` — built so failures reach Sentry/OTel with *where*, *why* and *what data*. Inspired by [neverthrow](https://github.com/supermacro/neverthrow).
 
@@ -52,7 +52,7 @@ Zero runtime dependencies; `zod`, `drizzle-orm`, `pg` are optional peers. See [`
 npx skills add Thourum/Fault
 ```
 
-They are also rendered at [fault.itterno.dev/docs/#agents](https://fault.itterno.dev/docs/#agents).
+They are also rendered at [fault.itterno.dev/guides/agents](https://fault.itterno.dev/guides/agents).
 
 ## Develop
 

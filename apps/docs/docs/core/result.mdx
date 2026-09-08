@@ -1,0 +1,238 @@
+---
+title: "Result"
+description: "A synchronous success or failure: Ok with a value, or Err with an error."
+---
+
+# Result
+
+`Result<T, E> = Ok<T, E> | Err<T, E>` represents a synchronous success or failure.
+
+## ok / err
+
+`ok<T, E = never>(value: T): Ok<T, E>` / `err<T = never, E = unknown>(error: E): Err<T, E>`
+
+```ts
+const found = ok({ id: 'usr_123' })
+found.isOk()
+const missing = err(new Fault('user not found').withTag('NOT_FOUND'))
+```
+
+Use `ok` for a value and `err` for the failure value.
+
+## isOk / isErr
+
+`isOk(): this is Ok<T, E>` / `isErr(): this is Err<T, E>`
+
+```ts
+const result: Result<number, Fault> = parsePort('3000')
+
+if (result.isOk()) {
+  listen(result.value)
+} else {
+  result.error.capture()
+}
+```
+
+Use these type guards when control flow needs the concrete variant.
+
+## Result.combine
+
+`Result.combine(resultList: readonly Result<unknown, unknown>[]): Result<unknown[], unknown>`
+
+```ts
+const user = Result.combine([
+  parseUserId(rawId),
+  parsePreferences(rawId),
+])
+```
+
+`Result.combine` returns all `Ok` values or short-circuits with the first `Err`.
+
+## Result.combineWithAllErrors
+
+`Result.combineWithAllErrors(resultList: readonly Result<unknown, unknown>[]): Result<unknown[], unknown[]>`
+
+```ts
+const checks = Result.combineWithAllErrors([
+  validateEmail(email),
+  validatePassword(password),
+])
+```
+
+`Result.combineWithAllErrors` collects every `Err` instead of stopping at the first one.
+
+## map
+
+`map<A>(f: (value: T) => A): Result<A, E>`
+
+```ts
+const label = ok(3000)
+  .map((port) => `port:${port}`)
+  .unwrapOr('port:unknown')
+```
+
+`map` transforms an `Ok` value and leaves an `Err` untouched.
+
+## mapErr
+
+`mapErr<U>(f: (error: E) => U): Result<T, U>`
+
+```ts
+const config = fromThrowable(JSON.parse)(rawConfig)
+  .mapErr((error) =>
+    Fault.from(error as Error).withTag('PARSE_ERROR'),
+  )
+```
+
+`mapErr` transforms an `Err` value and leaves an `Ok` untouched.
+
+## andThen
+
+`andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F>`
+
+```ts
+const user = parseUserId(rawId)
+  .andThen((id) => findUser(id))
+  .orInspect((fault) => fault.capture())
+```
+
+Use `andThen` when the next synchronous computation can also fail.
+
+## andCheck
+
+`andCheck<F>(f: (value: T) => Result<unknown, F>): Result<T, E | F>`
+
+```ts
+const checkPositive = (n: number): Result<string, Fault> =>
+  n > 0 ? ok('discarded') : err(new Fault('not positive'))
+ok(5).andCheck(checkPositive)   // Ok(5), not Ok('discarded')
+ok(-1).andCheck(checkPositive) // Err(Fault)
+```
+
+`andCheck` keeps the original `Ok` value when the check succeeds and propagates the check's `Err` when it fails.
+
+## andInspect
+
+`andInspect(f: (value: T) => unknown): Result<T, E>`
+
+```ts
+const port = parsePort('3000')
+  .andInspect((value) => metrics.record('port', value))
+  .unwrapOr(3000)
+```
+
+`andInspect` runs a side effect only on `Ok`, ignores anything it returns or throws, and keeps the original result.
+
+## orInspect
+
+`orInspect(f: (error: E) => unknown): Result<T, E>`
+
+```ts
+const port = parsePort('bad')
+  .orInspect((fault) => fault.capture())
+  .unwrapOr(3000)
+```
+
+`orInspect` runs a side effect only on `Err`, ignores anything it returns or throws, and keeps the original result.
+
+## orElse
+
+`orElse<U, F>(f: (error: E) => Result<U, F>): Result<T | U, F>`
+
+```ts
+const config = loadConfig()
+  .orElse(() => ok({ port: 3000 }))
+  .andInspect(applyConfig)
+```
+
+Use `orElse` to recover from an `Err` with another `Result`.
+
+## unwrapOr
+
+`unwrapOr<A>(fallback: A): T | A`
+
+```ts
+const rawPort = process.env.PORT ?? ''
+const port = parsePort(rawPort).unwrapOr(3000)
+listen(port)
+```
+
+`unwrapOr` returns the `Ok` value or the fallback for an `Err`.
+
+## match
+
+`match<A, B = A>(ok: (value: T) => A, err: (error: E) => B): A | B`
+
+```ts
+const status = parsePort(rawPort).match(
+  (port) => `listening on ${port}`,
+  (fault) => `failed: ${fault.message}`,
+)
+```
+
+`match` handles both variants and returns the selected callback's value.
+
+## asyncAndThen
+
+`asyncAndThen<U, F>(f: (value: T) => ResultAsync<U, F>): ResultAsync<U, E | F>`
+
+```ts
+const user = parseUserId(rawId)
+  .asyncAndThen((id) => fetchUser(id))
+  .orInspect((fault) => fault.capture())
+```
+
+Use `asyncAndThen` to continue a synchronous `Result` with a fallible asynchronous computation.
+
+## asyncAndCheck
+
+`asyncAndCheck<F>(f: (value: T) => ResultAsync<unknown, F>): ResultAsync<T, E | F>`
+
+```ts
+const user = parseUser(rawUser)
+  .asyncAndCheck((value) => validateUserAsync(value))
+```
+
+`asyncAndCheck` runs an asynchronous check while preserving the original `Ok` value when it succeeds.
+
+## asyncMap
+
+`asyncMap<U>(f: (value: T) => Promise<U>): ResultAsync<U, E>`
+
+```ts
+const profile = parseUserId(rawId)
+  .asyncMap((id) => loadProfile(id))
+  .orInspect((fault) => fault.capture())
+```
+
+`asyncMap` transforms an `Ok` with a promise and returns a `ResultAsync`.
+
+## fromThrowable
+
+`fromThrowable<Fn extends (...args: readonly any[]) => any, E>(fn: Fn, errorFn?: (error: unknown) => E): (...args: Parameters<Fn>) => Result<ReturnType<Fn>, E>`
+
+```ts
+const parseJson = fromThrowable(
+  JSON.parse,
+  (error) => Fault.from(error as Error).withTag('PARSE_ERROR'),
+)
+const config = parseJson(rawConfig)
+```
+
+`fromThrowable` catches synchronous throws and maps them to `Err`; it does not catch rejected promises.
+
+## safeTry
+
+`safeTry<T, E>(body: () => Generator<Err<never, E>, Result<T, E>>): Result<T, E>`
+
+`safeTry<T, E>(body: () => AsyncGenerator<Err<never, E>, Result<T, E>>): ResultAsync<T, E>`
+
+```ts
+const total = safeTry(function* () {
+  const first = yield* loadAmount('first')
+  const second = yield* loadAmount('second')
+  return ok(first + second)
+})
+```
+
+Inside `safeTry`, `yield*` unwraps each `Ok` and returns the first `Err`; an async generator returns `ResultAsync`.

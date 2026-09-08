@@ -1,0 +1,166 @@
+---
+title: "fault-from-try-catch"
+description: "Use when migrating try/catch, thrown errors, or Promise rejections to Result/ResultAsync from @thourum/fault."
+---
+
+{/* Generated from skills/fault-from-try-catch/SKILL.md by scripts/sync-skills.ts. Edit the skill, not this file. */}
+
+# Migrate try/catch to fault
+
+```sh
+npx skills add Thourum/Fault --skill fault-from-try-catch
+```
+
+Wrap only code that actually throws. Return `Result` / `ResultAsync`. Never throw from a Result-returning function.
+
+## Find the boundary
+
+Only wrap 3rd-party calls, `JSON.parse`, `fs`, `fetch`, DB. Inner pure code stays plain.
+
+```ts
+// before — try wraps the whole function
+try {
+  const raw = JSON.parse(text)
+  return normalize(raw) // cannot throw
+} catch (e) {
+  throw e
+}
+
+// after — wrap the thrower only
+const parsed = safeJsonParse<Raw>(text)
+return parsed.map(normalize)
+```
+
+## Wrap throwers
+
+Sync → `fromThrowable` / `Result.fromThrowable`. Does not catch rejected promises.
+
+```ts
+// fromThrowable<Fn, E>(fn: Fn, errorFn?: (e: unknown) => E): (...args) => Result<ReturnType<Fn>, E>
+const parseJson = fromThrowable(
+  JSON.parse,
+  (e) => Fault.from(e as Error).withTag('PARSE_ERROR'),
+)
+const config = parseJson(rawConfig)
+```
+
+Existing promise → `fromPromise` / `ResultAsync.fromPromise`. Async fn (sync throw + reject) → `fromAsyncThrowable` / `ResultAsync.fromThrowable`.
+
+```ts
+// fromPromise<T, E>(promise: PromiseLike<T>, errorFn: (e: unknown) => E): ResultAsync<T, E>
+const user = fromPromise(
+  client.users.get(id),
+  (e) => Fault.from(e as Error).withTag('CONNECTION_ERROR'),
+)
+
+// ResultAsync.fromThrowable<A, R, E>(fn: (...args: A) => Promise<R>, errorFn?: (err: unknown) => E)
+const loadUser = fromAsyncThrowable(
+  (id: string) => client.users.get(id),
+  (e) => Fault.from(e as Error).withTag('CONNECTION_ERROR'),
+)
+```
+
+## Prefer shipped wrappers
+
+| Import | Use instead of |
+|---|---|
+| `@thourum/fault/fetch` `safeFetch(url, init?)` | `fetch` + try/catch |
+| `@thourum/fault/zod` `safeZodParse(schema, data)` / `safeZodParse(schema)` | `schema.parse` |
+| `@thourum/fault/drizzle` `safeDb(promise)`, `DatabaseError(cause)` | drizzle try/catch |
+| `@thourum/fault/pg` `parsePgError(pgError)` | raw `pg` error mapping |
+| `@thourum/fault/std` `safeJsonParse`, `safeReadFile`, `safeEnv` | `JSON.parse`, `fs`, `process.env` |
+
+```ts
+import { safeFetch } from '@thourum/fault/fetch'
+import { safeZodParse } from '@thourum/fault/zod'
+import { safeDb } from '@thourum/fault/drizzle'
+import { safeJsonParse, safeReadFile, safeEnv } from '@thourum/fault/std'
+
+safeEnv('API_TOKEN')
+safeJsonParse<unknown>(text)
+safeReadFile(path)
+safeDb(db.query.users.findFirst({ where: eq(users.id, id) }))
+safeFetch<unknown>('/api/user').andThen((data) => safeZodParse(userSchema, data))
+```
+
+## Replace catch sites
+
+```ts
+// catch { return default } → unwrapOr
+try { return JSON.parse(text) } catch { return {} }
+safeJsonParse(text).unwrapOr({})
+
+// catch { throw new X } → mapErr / orElse + withCause
+try { return load() } catch (e) { throw new Error('load failed', { cause: e }) }
+load().mapErr((f) => Fault.from('load failed').withTag('INTERNAL_ERROR').withCause(f))
+load().orElse((f) => err(Fault.from('load failed').withTag('INTERNAL_ERROR').withCause(f)))
+
+// catch { log; rethrow } → orInspect
+try { return load() } catch (e) { log(e); throw e }
+load().orInspect((f) => f.capture())
+
+// final try at an HTTP handler → match
+try { res.json(await loadUser(id)) } catch (e) { res.status(500).json(e) }
+loadUser(id).match(
+  (user) => res.json(user),
+  (fault) => res.status(500).json(fault.toJSON()),
+)
+```
+
+`ResultAsync.match` / `unwrapOr` return `Promise`.
+
+## Return Result, never throw
+
+```ts
+// before: async function loadUser(id: string): Promise<User> { throw … }
+function loadUser(id: string): ResultAsync<User, Fault> {
+  return safeDb(db.query.users.findFirst({ where: eq(users.id, id) })).andThen((row) =>
+    row ? okAsync(row) : errAsync(new Fault('not found').withTag('NOT_FOUND')),
+  )
+}
+
+function parseConfig(text: string): Result<Config, Fault> {
+  return safeJsonParse<Config>(text)
+}
+```
+
+## Sequential work: safeTry
+
+```ts
+// yield* unwraps Ok, returns the first Err
+const total = safeTry(function* () {
+  const first = yield* loadAmount('first')
+  const second = yield* loadAmount('second')
+  return ok(first + second)
+})
+
+// async generator → ResultAsync
+const saved = safeTry(async function* () {
+  const user = yield* loadUser(id)
+  const row = yield* saveUser(user)
+  return ok(row)
+})
+```
+
+## Capture once at the edge
+
+```ts
+import { Fault } from '@thourum/fault'
+
+Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })
+
+return runOperation().orInspect((fault) =>
+  fault.withMetadata({ requestId }).capture(),
+)
+```
+
+Do not call `capture()` in helpers. Lower layers add tag / details / metadata / cause and return; the edge captures once.
+
+## Do not
+
+- `_unsafeUnwrap` / `_unsafeUnwrapErr` outside tests
+- `try { resultFn() }` — Result does not throw; wrapping it hides nothing
+- `instanceof` to narrow faults — use `fault.tag`
+- `Promise<Result<T, Fault>>` — return `ResultAsync<T, Fault>`
+- throw from a function whose return type is `Result` / `ResultAsync`
+- `fromThrowable` on an async function — use `fromAsyncThrowable` / `fromPromise`

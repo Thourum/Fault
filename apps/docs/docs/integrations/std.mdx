@@ -1,0 +1,80 @@
+---
+title: "/std"
+description: "@thourum/fault/std provides small Result wrappers for JSON, files, and environment variables."
+---
+
+# /std
+
+@thourum/fault/std provides small Result wrappers for JSON, files, and environment variables.
+
+## safeJsonParse
+
+`safeJsonParse<T = unknown>(text: string): Result<T, Fault>`
+
+```ts
+const config = safeJsonParse<Config>(text)
+config.match(useConfig, handleFault)
+```
+
+`safeJsonParse` returns the parsed value or preserves the thrown cause with `JSON.parse failed` details.
+
+**Tag produced:** `PARSE_ERROR`.
+
+## safeJsonStringify
+
+`safeJsonStringify(value: unknown, space?: number): Result<string, Fault>`
+
+```ts
+const json = safeJsonStringify({ enabled: true }, 2)
+json.match(writeConfig, handleFault)
+```
+
+`safeJsonStringify` treats circular values, `BigInt`, and an `undefined` JSON result as parse faults with `JSON.stringify failed` details.
+
+**Tag produced:** `PARSE_ERROR`.
+
+## safeReadFile
+
+`safeReadFile(path: string, encoding: BufferEncoding = 'utf8'): ResultAsync<string, Fault>`
+
+```ts
+const contents = await safeReadFile('./config.json')
+contents.match(useContents, handleFault)
+```
+
+`safeReadFile` records the file `path` and error `code` in metadata and maps filesystem codes with the table below.
+
+**Tags produced:** `NOT_FOUND`, `FORBIDDEN`, or `INTERNAL_ERROR`.
+
+## safeWriteFile
+
+`safeWriteFile(path: string, data: string | Uint8Array): ResultAsync<void, Fault>`
+
+```ts
+const saved = await safeWriteFile('./output.json', text)
+saved.match(onSaved, handleFault)
+```
+
+`safeWriteFile` uses the same filesystem tag mapping and metadata as `safeReadFile`.
+
+**Tags produced:** `NOT_FOUND`, `FORBIDDEN`, or `INTERNAL_ERROR`.
+
+| Filesystem code | Tag |
+| --- | --- |
+| `ENOENT` | `NOT_FOUND` |
+| `EACCES` | `FORBIDDEN` |
+| `EPERM` | `FORBIDDEN` |
+| Every other code | `INTERNAL_ERROR` |
+
+## safeEnv
+
+`safeEnv(name: string): Result<string, Fault>`
+
+```ts
+const databaseUrl = safeEnv('DATABASE_URL')
+databaseUrl.match(connect, handleFault)
+```
+
+`safeEnv` rejects missing and empty variables, including the variable `name` in metadata.
+
+**Tag produced:** `CONFIGURATION_ERROR`.

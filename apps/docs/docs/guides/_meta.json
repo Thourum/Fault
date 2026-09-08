@@ -1,0 +1,5 @@
+[
+  "error-tracing",
+  "agents",
+  { "type": "dir", "name": "skills", "label": "Skills", "collapsible": true, "collapsed": false }
+]

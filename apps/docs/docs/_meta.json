@@ -1,0 +1,18 @@
+[
+  "getting-started",
+  {
+    "type": "dir-section-header",
+    "name": "core",
+    "label": "Core"
+  },
+  {
+    "type": "dir-section-header",
+    "name": "integrations",
+    "label": "Integrations"
+  },
+  {
+    "type": "dir-section-header",
+    "name": "guides",
+    "label": "Guides"
+  }
+]
