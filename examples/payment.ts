@@ -4,7 +4,7 @@ import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { ok, err, retry, Fault, ServiceError } from '@thourum/fault'
 import { safeDb } from '@thourum/fault/drizzle'
-import { safeFetch } from '@thourum/fault/fetch'
+import { safeFetchJSON } from '@thourum/fault/fetch'
 import { safeZodParse } from '@thourum/fault/zod'
 
 declare const Sentry: { captureException: (e: unknown, ctx?: unknown) => void }
@@ -31,7 +31,7 @@ export function chargeUser(userId: string, amountCents: number) {
     .andThen((user) => (user ? ok(user) : err(ServiceError("NOT_FOUND", `user ${userId} not found`))))
     .andThen((user) => (user.paidAt ? err(ServiceError("CONFLICT", "already paid")) : ok(user)))
     .andThen((user) =>
-      safeFetch("https://api.stripe.com/v1/payment_intents", {
+      safeFetchJSON("https://api.stripe.com/v1/payment_intents", {
         method: "POST",
         headers: { Authorization: `Bearer ${stripeKey}` },
         body: new URLSearchParams({ amount: String(amountCents), currency: "eur", customer: user.stripeId }),
@@ -47,5 +47,6 @@ export function chargeUser(userId: string, amountCents: number) {
     .andInspect(({ user, intent }) =>
       logger.info("payment ok", { userId: hash(user.id), intent: intent.id, amountCents }),
     )
-    .orInspect((fault) => fault.withMetadata({ userId: hash(userId), amountCents }).capture())
+    .mapErr((fault) => fault.withMetadata({ userId: hash(userId), amountCents }))
+    .orInspect((fault) => fault.capture())
 }

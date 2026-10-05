@@ -9,19 +9,27 @@ description: "@thourum/fault/fetch turns native fetch failures, HTTP errors, and
 
 ## safeFetch
 
-`safeFetch<T = unknown>(input: URL | string, init?: RequestInit): ResultAsync<T, Fault>`
+`safeFetch(input: URL | string, init?: RequestInit): ResultAsync<Response, Fault>`
 
 ```ts
-const result = await safeFetch<unknown>('/api/user')
-
-result
-  .andThen((data) => safeZodParse(userSchema, data))
-  .match(showUser, showFault)
+const result = await safeFetch('/api/user')
+result.match(handleResponse, showFault)
 ```
 
-A successful response parses `application/json` and `application/*+json` bodies, while a `204`, an empty body, or another media type returns `undefined`; thrown requests become `NETWORK_ERROR`, invalid successful JSON becomes `PARSE_ERROR`, and non-OK responses use the table below.
+A successful response returns the native `Response` with its body untouched. Read it as text, bytes, a stream or JSON as needed. Non-OK responses use the status table below. Reading the returned response body yourself may still throw; use `safeFetchJSON` when you need JSON parsing in the Result.
 
-**Tags produced:** `NETWORK_ERROR`, `PARSE_ERROR`, `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `RATE_LIMITED`, or `INTERNAL_ERROR`.
+## safeFetchJSON
+
+`safeFetchJSON<T = unknown>(input: URL | string, init?: RequestInit): ResultAsync<T, Fault>`
+
+```ts
+const user = await safeFetchJSON<unknown>('/api/user')
+  .andThen((data) => safeZodParse(userSchema, data))
+```
+
+Built on `safeFetch`. A successful response is always parsed as JSON, regardless of content type. Empty bodies (including `204`) and malformed JSON produce `PARSE_ERROR`; the latter preserves the `SyntaxError` as its cause. Parse faults retain `httpStatus` metadata. A request or body read that times out produces `TIMEOUT_ERROR` with message "The request timed out."; one that is aborted produces `ABORTED` with message "The request was aborted."; other network and body-read failures produce `NETWORK_ERROR`.
+
+**Tags produced:** `TIMEOUT_ERROR`, `ABORTED`, `NETWORK_ERROR`, `PARSE_ERROR` (JSON helper), `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `RATE_LIMITED`, or `INTERNAL_ERROR`.
 
 | HTTP status | Tag |
 | --- | --- |
@@ -33,4 +41,4 @@ A successful response parses `application/json` and `application/*+json` bodies,
 | `500` and above | `INTERNAL_ERROR` |
 | Every other non-OK status | `BAD_REQUEST` |
 
-HTTP faults include `httpStatus`, `httpStatusText`, `httpHeaders`, and `httpBody` metadata. The body is parsed as JSON when possible and otherwise kept as text.
+HTTP faults include `httpStatus`, `httpStatusText`, `httpHeaders`, and `httpBody` metadata. Headers are copied verbatim, so redact sensitive metadata before sending it to logs or telemetry. The body is parsed as JSON when possible and otherwise kept as text.

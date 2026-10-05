@@ -12,8 +12,8 @@ Optional subpaths wrap throwers into `Result` / `ResultAsync<..., Fault>`. The r
 | Import path | What it wraps | Exports | Peer |
 | --- | --- | --- | --- |
 | `@thourum/fault` | Result, Fault, retry | `Result`, `ResultAsync`, `Fault`, `fromPromise`, `fromThrowable`, `retry`, `ServiceError` | — |
-| `@thourum/fault/fetch` | native `fetch` | `safeFetch` | — |
-| `@thourum/fault/zod` | Zod schemas | `safeZodParse`, `fromZodError` | `zod` `>=3.25.0` |
+| `@thourum/fault/fetch` | native `fetch` | `safeFetch`, `safeFetchJSON` | — |
+| `@thourum/fault/zod` | Zod schemas | `safeZodParse`, `fromZodError` | `zod` `>=4.0.0` |
 | `@thourum/fault/drizzle` | Drizzle query promises | `safeDb`, `DatabaseError` | `drizzle-orm` `>=0.44.0` |
 | `@thourum/fault/pg` | PostgreSQL / Node connection codes | `parsePgError`, `isPostgresError` | `pg` `>=8.0.0` |
 | `@thourum/fault/std` | JSON, files, env | `safeJsonParse`, `safeJsonStringify`, `safeReadFile`, `safeWriteFile`, `safeEnv` | — |
@@ -29,14 +29,14 @@ const session = fromPromise(store.get(id), (e) =>
 ```
 
 ```ts
-import { safeFetch } from '@thourum/fault/fetch'
+import { safeFetchJSON } from '@thourum/fault/fetch'
 
-const user = await safeFetch<unknown>('/api/user').andThen((data) =>
+const user = await safeFetchJSON<unknown>('/api/user').andThen((data) =>
   safeZodParse(userSchema, data),
 )
 ```
 
-See [safeFetch](/integrations/fetch).
+See [safeFetch and safeFetchJSON](/integrations/fetch).
 
 ```ts
 import { safeZodParse } from '@thourum/fault/zod'
