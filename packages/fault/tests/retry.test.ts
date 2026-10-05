@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { okAsync, errAsync, ResultAsync } from '../src'
+import { okAsync, errAsync, Fault, ResultAsync } from '../src'
 import { retry } from '../src/retry'
 
 const failing = (failures: number) => {
@@ -33,12 +33,45 @@ describe('retry', () => {
     await retry(failing(2), { times: 3, delayMs: 30 })
     expect(Date.now() - t0).toBeGreaterThanOrEqual(55)
   })
-  it('returns a ResultAsync (chainable)', async () => {
-    const r = retry(failing(0), { times: 1 })
-    expect(r).toBeInstanceOf(ResultAsync)
-    expect((await r.map((v) => v + 1))._unsafeUnwrap()).toBe(43)
+  it('returns Err Fault with the thrown cause and stops when fn throws', async () => {
+    const cause = new Error('x')
+    let calls = 0
+    const result = await retry(() => { calls++; throw cause }, { times: 3 })
+    expect(result.isErr()).toBe(true)
+    const fault = result._unsafeUnwrapErr()
+    expect(fault).toBeInstanceOf(Fault)
+    if (!(fault instanceof Fault)) throw new Error('Expected Fault')
+    expect(fault.tag).toBe('UNKNOWN_ERROR')
+    expect(fault.cause).toBe(cause)
+    expect(calls).toBe(1)
   })
-  it('rejects when fn throws synchronously', async () => {
-    await expect(Promise.resolve(retry(() => { throw new Error('x') }, { times: 2 }))).rejects.toThrow('x')
+  it('keeps the original cause when a thrown value cannot be stringified', async () => {
+    const cause = Object.create(null)
+    const result = await retry(() => { throw cause }, { times: 3 })
+    const fault = result._unsafeUnwrapErr()
+    expect(fault).toBeInstanceOf(Fault)
+    if (!(fault instanceof Fault)) throw new Error('Expected Fault')
+    expect(fault.message).toBe('Unknown error')
+    expect(fault.cause).toBe(cause)
+  })
+  it('returns Err Fault when fn returns a rejecting ResultAsync', async () => {
+    const cause = 'rejected'
+    const result = await retry(() => new ResultAsync<number, string>(Promise.reject(cause)), { times: 3 })
+    const fault = result._unsafeUnwrapErr()
+    expect(fault).toBeInstanceOf(Fault)
+    if (!(fault instanceof Fault)) throw new Error('Expected Fault')
+    expect(fault.cause).toBe(cause)
+  })
+  it('returns Err Fault when when throws and stops retrying', async () => {
+    const cause = new Error('predicate failed')
+    let calls = 0
+    const result = await retry(() => { calls++; return errAsync<number, string>('try again') }, {
+      times: 3, when: () => { throw cause },
+    })
+    const fault = result._unsafeUnwrapErr()
+    expect(fault).toBeInstanceOf(Fault)
+    if (!(fault instanceof Fault)) throw new Error('Expected Fault')
+    expect(fault.cause).toBe(cause)
+    expect(calls).toBe(1)
   })
 })
