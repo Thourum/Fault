@@ -29,7 +29,7 @@ Default to using Bun instead of Node.js.
 
 ## Testing
 
-Use `bun test` to run tests.
+Use `bun test` to run tests. Type assertions live in `tests/types.test.ts` using `bun:test`'s `expectTypeOf`; `bun run typecheck` checks them with tsgo via `tests/tsconfig.tests.json` (they do not assert at runtime). Run `bun run local-ci` for typecheck, tests, build and export checks.
 
 ```ts#index.test.ts
 import { test, expect } from "bun:test";

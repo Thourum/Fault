@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { mkdtempSync, rmSync, chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -24,6 +24,7 @@ describe('safeJsonStringify', () => {
 describe('fs helpers', () => {
   const dir = mkdtempSync(join(tmpdir(), 'fault-std-'))
   afterEach(() => { try { chmodSync(join(dir, 'locked'), 0o644) } catch {} })
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
   it('write then read round-trips', async () => {
     const p = join(dir, 'a.txt')
@@ -47,7 +48,6 @@ describe('fs helpers', () => {
     const f = (await safeWriteFile(join(dir, 'nope', 'x.txt'), 'hi'))._unsafeUnwrapErr()
     expect(f.tag).toBe('NOT_FOUND'); expect(f.metadata.code).toBe('ENOENT')
   })
-  it('cleanup', () => rmSync(dir, { recursive: true, force: true }))
 })
 
 describe('safeEnv', () => {
