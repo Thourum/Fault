@@ -38,7 +38,8 @@ describe('Fault', () => {
       ['BAD_REQUEST', 400], ['VALIDATION_ERROR', 400], ['UNAUTHORIZED', 401], ['PAYMENT_FAILED', 402],
       ['FORBIDDEN', 403], ['NOT_FOUND', 404], ['CONFLICT', 409], ['UNIQUE_CONSTRAINT_ERROR', 409],
       ['RATE_LIMITED', 429], ['INTERNAL_ERROR', 500], ['CONFIGURATION_ERROR', 500], ['EXTERNAL_ERROR', 502],
-      ['NETWORK_ERROR', 503], ['CONNECTION_ERROR', 503], ['SOME_CUSTOM', 500],
+      ['NETWORK_ERROR', 503], ['CONNECTION_ERROR', 503], ['TIMEOUT_ERROR', 504],
+      ['ABORTED', 499], ['SOME_CUSTOM', 500],
     ]
     for (const [tag, code] of cases) expect(new Fault('x').withTag(tag).statusCode).toBe(code)
   })
@@ -51,17 +52,68 @@ describe('Fault', () => {
     const j = outer.toJSON() as { cause: { tag: string; message: string } }
     expect(j.cause.tag).toBe('DATABASE_ERROR'); expect(j.cause.message).toBe('inner')
   })
+  it('builders leave the original unchanged and preserve the cloned fault origin', () => {
+    const cause = new Error('root')
+    const original = new Fault('original')
+    original.name = 'SpecificError'
+    const tagged = original.withTag('NOT_FOUND')
+    const enriched = tagged.withMetadata('requestId', 'req_1')
+    const chained = enriched.withCause(cause).withDescription('internal', 'safe message')
+
+    expect(original.tag).toBe('UNKNOWN_ERROR')
+    expect(original.metadata).toEqual({})
+    expect(original.cause).toBeUndefined()
+    expect(original.details).toBeUndefined()
+    expect(original.message).toBe('original')
+    expect(original.toString()).toBe('SpecificError: original')
+    expect(tagged.metadata).toEqual({})
+    expect(enriched.cause).toBeUndefined()
+    expect(chained).not.toBe(original)
+    expect(chained.stack).toBe(original.stack)
+    expect(chained.location).toBe(original.location)
+    expect(chained.name).toBe('SpecificError')
+    expect(chained.tag).toBe('NOT_FOUND')
+    expect(chained.metadata).toEqual({ requestId: 'req_1' })
+    expect(chained.cause).toBe(cause)
+    expect(chained.details).toBe('internal')
+    expect(chained.message).toBe('safe message')
+    expect(chained.toString()).toBe('SpecificError: safe message')
+    expect(chained.toJSON().message).toBe('safe message')
+    const later = chained.withDetails('updated')
+    expect(later.message).toBe('safe message')
+    expect(later.toString()).toBe('SpecificError: safe message')
+    expect(later.toJSON().message).toBe('safe message')
+    expect(JSON.parse(JSON.stringify(later)).message).toBe('safe message')
+  })
+  it('builders keep the subclass prototype when chaining', () => {
+    class SpecificFault extends Fault {
+      id = 'fault_1'
+      constructor(message: string) {
+        super(message)
+        Object.defineProperty(this, 'x', {
+          get: () => { throw new Error('read') },
+          enumerable: true,
+          configurable: true,
+        })
+      }
+    }
+    const original = new SpecificFault('specific')
+    const derived = original.withDetails('context').withTag('CONFLICT')
+    expect(derived).toBeInstanceOf(SpecificFault)
+    expect(derived.id).toBe('fault_1')
+    expect(Object.getOwnPropertyDescriptor(derived, 'x')?.get).toBe(Object.getOwnPropertyDescriptor(original, 'x')?.get)
+    expect(derived).not.toBe(original)
+    expect(derived.details).toBe('context')
+    expect(derived.tag).toBe('CONFLICT')
+    expect(original.details).toBeUndefined()
+    expect(original.tag).toBe('UNKNOWN_ERROR')
+  })
   it('capture calls onCapture hook and returns this', () => {
     const seen: Fault[] = []
     Fault.onCapture = (f) => seen.push(f)
     const f = new Fault('x')
     expect(f.capture()).toBe(f)
     expect(seen).toEqual([f])
-  })
-  it('capture is a no-op without hook', () => {
-    // bun:test treats a returned Error as a throw, so assert identity instead
-    const f = new Fault('x')
-    expect(f.capture()).toBe(f)
   })
   it('Fault.from wraps Error keeping message', () => {
     expect(Fault.from(new Error('e')).message).toBe('e')

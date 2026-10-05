@@ -5,7 +5,7 @@ description: "Fault is an Error with a tag, developer details, metadata, causes,
 
 # Fault
 
-Fault is an Error with a tag, developer details, metadata, causes, HTTP status mapping, and an optional capture hook.
+Fault is an Error with a tag, developer details, metadata, causes, HTTP status mapping, and an optional capture hook. Every `with*` builder returns a new Fault without changing the original.
 
 ## new Fault
 
@@ -37,7 +37,7 @@ const fault = new Fault('user missing')
   .withTag('NOT_FOUND')
 ```
 
-`withTag` replaces the classification and returns the same fault for chaining.
+`withTag` returns a new fault with the replacement classification.
 
 ## withDetails
 
@@ -73,7 +73,7 @@ const fault = new Fault('stripe declined')
   .withMetadata({ amountCents: 4900, currency: 'eur' })
 ```
 
-Both overloads merge metadata into the fault and return the same instance.
+Both overloads return a new fault with merged metadata.
 
 ## withContext
 
@@ -97,7 +97,7 @@ const fault = new Fault('payment failed')
   .withCause(new Error('socket closed'))
 ```
 
-`withCause` attaches any thrown value as the standard `Error.cause` and returns the same fault.
+`withCause` returns a new fault with the thrown value as its standard `Error.cause`.
 
 ## tag
 
@@ -162,7 +162,9 @@ const status = new Fault('missing')
 | `NOT_FOUND` | 404 |
 | `CONFLICT`, `UNIQUE_CONSTRAINT_ERROR` | 409 |
 | `RATE_LIMITED` | 429 |
+| `ABORTED` (client closed request) | 499 |
 | `NETWORK_ERROR`, `CONNECTION_ERROR` | 503 |
+| `TIMEOUT_ERROR` | 504 |
 | `EXTERNAL_ERROR` | 502 |
 | `PARSE_ERROR`, `HTTP_ERROR` | `metadata.httpStatus` or 500 |
 | `DATABASE_ERROR`, `INTERNAL_ERROR`, `UNKNOWN_ERROR`, and every other tag | 500 |
@@ -251,6 +253,8 @@ type FaultTag =
   | 'DATABASE_ERROR'
   // Network/API
   | 'NETWORK_ERROR'
+  | 'TIMEOUT_ERROR'
+  | 'ABORTED'
   | 'PARSE_ERROR'
   | 'HTTP_ERROR'
   // Data

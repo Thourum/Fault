@@ -45,5 +45,6 @@ export function createPost(authorId: string, raw: unknown) {
         { times: 5, delayMs: 500, when: (f) => f.tag === "NETWORK_ERROR" || f.tag === "INTERNAL_ERROR" },
       ),
     )
-    .orInspect((fault) => fault.withMetadata({ authorId: hash(authorId) }).capture())
+    .mapErr((fault) => fault.withMetadata({ authorId: hash(authorId) }))
+    .orInspect((fault) => fault.capture())
 }
