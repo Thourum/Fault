@@ -121,9 +121,9 @@ retry(() => fetchThing(), {
 })
 ```
 
-`retry<T, E>(fn: () => ResultAsync<T, E>, opts: RetryOptions<E>): ResultAsync<T, E>`
+`retry<T, E>(fn: () => ResultAsync<T, E>, opts: RetryOptions<E>): ResultAsync<T, E | Fault>`
 
-`times` is total attempts. `fn` must return `ResultAsync` and must not throw; wrap throwers with `fromAsyncThrowable` first. See docs: retry.
+`times` is total attempts. A synchronous throw from `fn`, rejected `ResultAsync`, or throw from `when` resolves to `Err(Fault)` tagged `UNKNOWN_ERROR`, with the thrown value as cause, and stops retrying. To retry expected thrown failures, map them into tagged `Err` values with `fromAsyncThrowable` first. See docs: retry.
 
 ## Gotchas
 

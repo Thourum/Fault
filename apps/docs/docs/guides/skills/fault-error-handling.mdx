@@ -39,7 +39,7 @@ err(ServiceError('NOT_FOUND', 'User not found', `id=${id}`))
 
 `ServiceError(tag, message, description?)` is `new Fault(message).withTag(tag).withDescription(description ?? message)`. Use it for tag + message. The third arg becomes developer `details`, not a user-facing override.
 
-Use `new Fault(...)` when wrapping an `Error`, attaching metadata/cause, or calling two-arg `withDescription(details, userMessage)`.
+Use `new Fault(...)` when wrapping an `Error`, attaching metadata/cause, or calling two-arg `withDescription(details, userMessage)`. Builders return a new Fault without changing the original; use `mapErr` to replace a Result's error.
 
 `FaultTag` is a fixed union of SCREAMING_SNAKE tags plus `(string & {})` — `withTag` accepts any string; known tags autocomplete. `statusCode` is derived from the tag (default 500). Custom tags are 500.
 
@@ -126,13 +126,13 @@ fromAsyncThrowable(async (id) => db.find(id), (e) => Fault.from(e as Error).with
 retry(() => fetchThing(), { times: 3, delayMs: 200, when: (f) => f.tag === 'NETWORK_ERROR' })
 ```
 
-`RetryOptions`: `times` (total attempts, required), `delayMs?` (default 0), `when?: (error: E) => boolean` (default always). `fn` must return `ResultAsync` and not throw.
+`RetryOptions`: `times` (total attempts, required), `delayMs?` (default 0), `when?: (error: E) => boolean` (default always). `fn` must return `ResultAsync`; throws from `fn` or `when` become `Err(Fault)` with the thrown value as cause and stop retrying.
 
 ```ts
-import { safeFetch } from '@thourum/fault/fetch'          // ResultAsync<T, Fault>
+import { safeFetch, safeFetchJSON } from '@thourum/fault/fetch' // ResultAsync<Response, Fault> / ResultAsync<T, Fault>
 import { safeZodParse } from '@thourum/fault/zod'         // Result<infer, Fault>
-import { safeDb } from '@thourum/fault/drizzle'           // ResultAsync<T, Fault>
-import { parsePgError } from '@thourum/fault/pg'          // Fault
+import { safeDb } from '@thourum/fault/drizzle'           // ResultAsync<T, Fault>; query/params in metadata
+import { parsePgError } from '@thourum/fault/pg'          // Fault; unknown codes retain driver message
 import { safeJsonParse, safeEnv } from '@thourum/fault/std' // Result<T, Fault>
 ```
 

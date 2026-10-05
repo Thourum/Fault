@@ -14,7 +14,7 @@
 
 Docs and site: https://fault.itterno.dev (source in [`apps/docs`](apps/docs)).
 
-`Result<T, Fault>` everywhere. A `Fault` carries tag, details, location, metadata and `cause`, and serialises with `toJSON()` — built so failures reach Sentry/OTel with *where*, *why* and *what data*. Inspired by [neverthrow](https://github.com/supermacro/neverthrow).
+`Result<T, Fault>` everywhere. A `Fault` carries tag, details, location, metadata and `cause`, and serialises with `toJSON()` — built so failures reach Sentry/OTel with *where*, *why* and *what data*. Its `with*` builders return new faults, leaving the original unchanged. Inspired by [neverthrow](https://github.com/supermacro/neverthrow).
 
 ```sh
 npm add @thourum/fault
@@ -22,12 +22,12 @@ npm add @thourum/fault
 
 ```ts
 import { ok, err, retry, Fault, ServiceError } from '@thourum/fault'
-import { safeFetch } from '@thourum/fault/fetch'
+import { safeFetchJSON } from '@thourum/fault/fetch'
 import { safeZodParse } from '@thourum/fault/zod'
 
 Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })
 
-const user = await retry(() => safeFetch('https://api.example.com/me'), { times: 3, delayMs: 200 })
+const user = await retry(() => safeFetchJSON('https://api.example.com/me'), { times: 3, delayMs: 200 })
   .andThen(safeZodParse(userSchema))
   .andThen((u) => (u.active ? ok(u) : err(ServiceError('FORBIDDEN', 'inactive'))))
   .orInspect((f) => f.capture())
@@ -36,13 +36,13 @@ const user = await retry(() => safeFetch('https://api.example.com/me'), { times:
 | Subpath | Exports |
 |---|---|
 | `@thourum/fault` | `Result`, `ResultAsync`, `ok`, `err`, `Fault`, `ServiceError`, `retry`, … |
-| `@thourum/fault/fetch` | `safeFetch` |
+| `@thourum/fault/fetch` | `safeFetch`, `safeFetchJSON` |
 | `@thourum/fault/zod` | `safeZodParse`, `fromZodError` |
-| `@thourum/fault/drizzle` | `safeDb`, `DatabaseError` |
-| `@thourum/fault/pg` | `parsePgError` |
+| `@thourum/fault/drizzle` | `safeDb`, `DatabaseError` — classifies pg codes, keeps driver messages and query metadata |
+| `@thourum/fault/pg` | `parsePgError` — specific known-code messages, real driver messages for unknown errors |
 | `@thourum/fault/std` | `safeJsonParse`, `safeJsonStringify`, `safeReadFile`, `safeWriteFile`, `safeEnv` |
 
-Zero runtime dependencies; `zod`, `drizzle-orm`, `pg` are optional peers. See [`packages/fault`](packages/fault) and [`examples/`](examples).
+Zero core runtime dependencies; `zod` (>=4.0.0), `drizzle-orm`, and `pg` are optional peers for their respective integrations. See [`packages/fault`](packages/fault) and [`examples/`](examples).
 
 ## Agent skills
 
