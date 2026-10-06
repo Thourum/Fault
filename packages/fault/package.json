@@ -68,7 +68,7 @@
   },
   "keywords": ["result", "error-handling", "neverthrow", "fault", "typescript"],
   "license": "MIT",
-  "homepage": "https://fault.itterno.dev",
+  "homepage": "https://fault.thourum.com",
   "bugs": "https://github.com/Thourum/Fault/issues",
   "repository": {
     "type": "git",
