@@ -24,4 +24,5 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run local-ci
       - run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
+      - run: npm install -g npm@latest
       - run: npm publish
