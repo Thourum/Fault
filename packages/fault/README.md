@@ -11,7 +11,7 @@ Result types with rich `Fault` errors, built for error tracing. Inspired by [nev
 
 ```sh
 npm add @thourum/fault          # or bun add
-npm add zod                     # only if you use @thourum/fault/zod
+npm add zod@^4                  # only if you use @thourum/fault/zod (Zod >=4.0.0)
 npm add drizzle-orm pg          # only if you use @thourum/fault/drizzle
 ```
 
@@ -36,10 +36,10 @@ Naming rule: `and*` runs on the Ok path, `or*` on the Err path.
 
 | Import | Exports |
 |---|---|
-| `@thourum/fault/fetch` | `safeFetch(url, init?)` → `ResultAsync<T, Fault>`; 4xx/5xx and network errors become tagged Faults |
+| `@thourum/fault/fetch` | `safeFetch(url, init?)` → `ResultAsync<Response, Fault>` (body untouched); `safeFetchJSON<T>(url, init?)` → `ResultAsync<T, Fault>` (always parses JSON). HTTP, network, timeout, abort and parse failures become tagged Faults |
 | `@thourum/fault/zod` | `safeZodParse(schema)(data)` / `safeZodParse(schema, data)`, `fromZodError(e)` |
-| `@thourum/fault/drizzle` | `safeDb(promise)`, `DatabaseError(cause)` — pg SQLSTATE → tags like `UNIQUE_CONSTRAINT_ERROR` |
-| `@thourum/fault/pg` | `parsePgError(pgError)` |
+| `@thourum/fault/drizzle` | `safeDb(promise)`, `DatabaseError(cause)` — pg codes → specific tags; query SQL/params in metadata, inner driver message in Fault message, original error as cause |
+| `@thourum/fault/pg` | `parsePgError(pgError)` — known codes → specific messages/tags, unknown errors → real driver message |
 | `@thourum/fault/std` | `safeJsonParse`, `safeJsonStringify`, `safeReadFile`, `safeWriteFile`, `safeEnv` |
 
 See `examples/payment.ts` and `examples/createPost.ts` for end-to-end flows.

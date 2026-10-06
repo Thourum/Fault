@@ -9,7 +9,7 @@ retry repeats a ResultAsync operation while it returns Err and the optional pred
 
 ## retry
 
-`retry<T, E>(fn: () => ResultAsync<T, E>, opts: { times: number, delayMs?: number, when?: (error: E) => boolean }): ResultAsync<T, E>`
+`retry<T, E>(fn: () => ResultAsync<T, E>, opts: { times: number, delayMs?: number, when?: (error: E) => boolean }): ResultAsync<T, E | Fault>`
 
 ```ts
 const user = retry(
@@ -26,9 +26,9 @@ const user = retry(
 
 The first attempt always runs, even when `times` is 0 or negative; set `times` to at least 1 because it represents the total attempts. `delayMs` is a fixed delay between attempts and defaults to 0, and `when` defaults to retrying every `Err`.
 
-The returned `ResultAsync` resolves to the first `Ok`, the `Err` rejected by `when`, or the last `Err` after all attempts.
+The returned `ResultAsync` resolves to the first `Ok`, the `Err` rejected by `when`, or the last `Err` after all attempts. If `fn` throws synchronously, returns a rejecting `ResultAsync`, or `when` throws, it resolves to `Err(Fault)` tagged `UNKNOWN_ERROR` with the thrown value as its cause. Throws stop retrying immediately; they do not consume the remaining attempts. Otherwise the original `Err<E>` remains unchanged.
 
-`fn` must return a `ResultAsync` without throwing synchronously; wrap a throwable async function with `ResultAsync.fromThrowable` first.
+Wrap throwable async operations with `ResultAsync.fromThrowable` to map expected failures into tagged, retryable `Err` values. A throw escaping `fn` becomes an `UNKNOWN_ERROR` instead, and `when` does not get to decide whether to retry it.
 
 ```ts
 const loadUser = ResultAsync.fromThrowable(

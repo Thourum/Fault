@@ -35,8 +35,8 @@ function extractFieldFromDetail(detail: string | undefined): string | null {
 
 /**
  * Parse common PostgreSQL errors into Fault instances
- * @param error - The error to parse
- * @returns A Fault instance with appropriate tag and context
+ * @param error - PostgreSQL, Node connection, or plain driver error
+ * @returns A Fault tagged by code when known; unknown errors retain the driver's message
  *
  * @example
  * import { parsePgError } from '@thourum/fault/pg';
@@ -44,16 +44,18 @@ function extractFieldFromDetail(detail: string | undefined): string | null {
  *   await db.insert(users).values(userData);
  * } catch (error) {
  *   const fault = parsePgError(error);
- *   // fault will have appropriate tag and user-friendly message
+ *   // known codes get specific messages; unknown errors retain the driver message
  * }
  */
-export function parsePgError(error: PgDatabaseError): Fault {
+export function parsePgError(error: PgDatabaseError | Error): Fault {
     if (!isPostgresError(error)) {
-        // Not a PostgreSQL error, return generic database error
-        return new Fault(error as Error)
-            .withTag('DATABASE_ERROR')
-            .withDescription('Database operation failed', 'An unexpected database error occurred.')
-            .withCause(error);
+        if (error instanceof Error && /Connection terminated/i.test(error.message)) {
+            return new Fault(error)
+                .withTag('CONNECTION_ERROR')
+                .withDescription('Database connection failed', 'Unable to connect to the database. Please try again later.')
+                .withCause(error);
+        }
+        return new Fault(error).withTag('DATABASE_ERROR').withCause(error);
     }
 
     const pgError = error;
@@ -160,7 +162,10 @@ export function parsePgError(error: PgDatabaseError): Fault {
         // Class 08 - Connection Exception (whole class, see below) + node system errors
         case 'ECONNREFUSED':
         case 'ENOTFOUND':
-        case 'ETIMEDOUT': {
+        case 'ETIMEDOUT':
+        case 'ECONNRESET':
+        case 'EPIPE':
+        case 'EAI_AGAIN': {
             // Connection errors
             return fault
                 .withTag('CONNECTION_ERROR')
@@ -194,12 +199,7 @@ export function parsePgError(error: PgDatabaseError): Fault {
                     );
             }
 
-            return fault
-                .withTag('DATABASE_ERROR')
-                .withDescription(
-                    `Database error: ${code}`,
-                    'A database error occurred. Please try again or contact support if the problem persists.'
-                );
+            return fault.withTag('DATABASE_ERROR');
         }
     }
 }

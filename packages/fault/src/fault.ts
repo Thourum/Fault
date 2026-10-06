@@ -1,7 +1,10 @@
 /**
  * Fault is an error handling class providing rich context preservation
  * and safe error reporting in applications. It combines debugging
- * capabilities with secure user communication patterns.
+ * capabilities with secure user communication patterns. Its with* builders
+ * return new faults and leave the original unchanged. Subclasses retain their
+ * prototype and public own fields; #private fields cannot be copied generically.
+ * Override builders if subclass #private fields must be preserved.
  *
  * @example Using with neverthrow Result types
  * import { err, ok } from '@thourum/fault'
@@ -64,6 +67,18 @@ export class Fault extends Error {
 
         this.#location = locationLine?.trim() || undefined;
         this.#tag = 'UNKNOWN_ERROR';
+    }
+
+    #clone(): this {
+        const copy = new Fault(this.message);
+        Object.defineProperties(copy, Object.getOwnPropertyDescriptors(this));
+        copy.#location = this.#location;
+        copy.#tag = this.#tag;
+        copy.#details = this.#details;
+        copy.#message = this.#message;
+        copy.#metadata = { ...this.#metadata };
+        Object.setPrototypeOf(copy, Object.getPrototypeOf(this));
+        return copy as this;
     }
 
     /**
@@ -143,6 +158,10 @@ export class Fault extends Error {
                 return 409;
             case 'RATE_LIMITED':
                 return 429;
+            case 'ABORTED':
+                return 499;
+            case 'TIMEOUT_ERROR':
+                return 504;
             case 'NETWORK_ERROR':
             case 'CONNECTION_ERROR':
                 return 503;
@@ -163,7 +182,7 @@ export class Fault extends Error {
     /**
      * Add a tag to classify this error
      * @param tag - One of the predefined FaultTags or custom string
-     * @returns this for method chaining
+     * @returns A new Fault; the original is unchanged
      *
      * @example
      * new Fault('error').withTag('AUTHENTICATION_ERROR')
@@ -172,15 +191,16 @@ export class Fault extends Error {
      * new Fault('error').withTag('CUSTOM_PAYMENT_ERROR')
      */
     withTag(tag: FaultTag): this {
-        this.#tag = tag;
-        return this;
+        const copy = this.#clone();
+        copy.#tag = tag;
+        return copy;
     }
 
     /**
      * Add details and an optional user-facing message to this error
      * @param details Detailed description for logging/debugging (developer-facing)
      * @param message Optional custom message shown to users; if omitted, original error message is used
-     * @returns this for method chaining
+     * @returns A new Fault; the original is unchanged
      *
      * @example
      * new Fault(err)
@@ -190,32 +210,31 @@ export class Fault extends Error {
      *   )
      */
     withDescription(details: string, message?: string): this {
-        this.#details = details;
-        if (message !== undefined) {
-            // This assignment is necessary to override the Error.message property
-            // The getter will use this value instead of the value from super.message
-            this.#message = message;
-            // Also need to update the inherited message property for toString() to work correctly
-            super.message = message;
-        }
-        return this;
+        const copy = this.#clone();
+        copy.#details = details;
+        if (message === undefined) return copy;
+        copy.#message = message;
+        // Error's own message property shadows the getter; toString() reads it.
+        (copy as Error).message = message;
+        return copy;
     }
 
     /**
      * Add details (developer context) to this error
      * @param details Detailed description for logging/debugging
-     * @returns this for method chaining
+     * @returns A new Fault; the original is unchanged
      */
     withDetails(details: string): this {
-        this.#details = details;
-        return this;
+        const copy = this.#clone();
+        copy.#details = details;
+        return copy;
     }
 
     /**
      * Add a single piece of metadata to this error
      * @param key - Metadata key
      * @param value - Metadata value
-     * @returns this for method chaining
+     * @returns A new Fault; the original is unchanged
      *
      * @example
      * new Fault('error')
@@ -231,7 +250,7 @@ export class Fault extends Error {
     /**
      * Add multiple pieces of metadata to this error
      * @param data - Object containing metadata key-value pairs
-     * @returns this for method chaining
+     * @returns A new Fault; the original is unchanged
      *
      * @example
      * new Fault('error').withContext({
@@ -242,16 +261,22 @@ export class Fault extends Error {
      * })
      */
     withContext(data: Record<string, unknown>): this {
-        for (const [key, value] of Object.entries(data)) {
-            this.#metadata[key] = value;
-        }
-        return this;
+        const copy = this.#clone();
+        copy.#metadata = { ...this.#metadata, ...data };
+        return copy;
     }
 
-    /** Attach the underlying cause (any thrown value). */
+    /** Return a new Fault with the underlying cause (any thrown value). */
     withCause(cause: unknown): this {
-        (this as Error & { cause?: unknown }).cause = cause;
-        return this;
+        const copy = this.#clone();
+        (copy as Error & { cause?: unknown }).cause = cause;
+        return copy;
+    }
+
+    #serializeCause(cause: unknown): unknown {
+        if (cause instanceof Fault) return cause.toJSON();
+        if (!(cause instanceof Error)) return cause;
+        return { name: cause.name, message: cause.message, stack: cause.stack };
     }
 
     /**
@@ -262,19 +287,7 @@ export class Fault extends Error {
      * logger.error(fault.toJSON())
      */
     toJSON(): Record<string, unknown> {
-        let causeValue = (this as Error & { cause?: unknown }).cause;
-
-        if (causeValue instanceof Error) {
-            if (causeValue instanceof Fault) {
-                causeValue = causeValue.toJSON();
-            } else {
-                causeValue = {
-                    name: causeValue.name,
-                    message: causeValue.message,
-                    stack: causeValue.stack,
-                };
-            }
-        }
+        const causeValue = this.#serializeCause((this as Error & { cause?: unknown }).cause);
 
         return {
             name: this.name,
@@ -342,6 +355,8 @@ export type FaultTag =
     | 'DATABASE_ERROR'
     // Network/API errors
     | 'NETWORK_ERROR'
+    | 'TIMEOUT_ERROR'
+    | 'ABORTED'
     | 'PARSE_ERROR'
     | 'HTTP_ERROR'
     // Data errors

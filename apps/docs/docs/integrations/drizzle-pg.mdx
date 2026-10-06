@@ -29,9 +29,9 @@ const inserted = safeDb(
 const fault = DatabaseError(error)
 ```
 
-`DatabaseError` unwraps a PostgreSQL error from a Drizzle error's `cause`, accepts a PostgreSQL error directly, and otherwise returns a `DATABASE_ERROR` labeled for transaction rollback, query, Drizzle, generic `Error`, or unknown failures.
+`DatabaseError` classifies a PostgreSQL/Node error directly or from a Drizzle error's `cause`, retaining the original outer error as the Fault's cause. A `DrizzleQueryError` uses its inner driver's message (or `Failed query` when absent), with `query` and `params` in metadata—not the message. A `TransactionRollbackError` without a recognized pg cause gets `TRANSACTION_ROLLBACK_ERROR` and its own message. Other errors keep the driver message (`String(cause)` for non-Errors) and get `DATABASE_ERROR`; no synthetic label is prepended. Driver messages can be sensitive, so do not send raw Fault messages straight to end users.
 
-**Tags produced:** `DATABASE_ERROR` or any tag from `parsePgError`.
+**Tags produced:** `DATABASE_ERROR`, `TRANSACTION_ROLLBACK_ERROR`, or any tag from `parsePgError`.
 
 ## isPostgresError
 
@@ -49,7 +49,7 @@ The check is deliberately duck-typed: the value must be an `Error`, contain a `c
 
 ## parsePgError
 
-`parsePgError(error: PgDatabaseError): Fault`
+`parsePgError(error: PgDatabaseError | Error): Fault`
 
 ```ts
 try {
@@ -61,7 +61,7 @@ try {
 }
 ```
 
-`parsePgError` adds `pgCode`, `pgDetail`, `pgTable`, `pgColumn`, `pgConstraint`, and `pgSchema` metadata, then maps codes as follows.
+`parsePgError` adds `pgCode`, `pgDetail`, `pgTable`, `pgColumn`, `pgConstraint`, and `pgSchema` metadata for coded errors, then maps codes as follows. Unknown codes and non-pg errors keep the real driver message; code-less errors matching `/Connection terminated/i` are connection failures.
 
 **Tags produced:** `UNIQUE_CONSTRAINT_ERROR`, `FOREIGN_KEY_ERROR`, `VALIDATION_ERROR`, `DATABASE_ERROR`, `CONNECTION_ERROR`, or `TRANSACTION_ROLLBACK_ERROR`.
 
@@ -77,9 +77,13 @@ try {
 | `ECONNREFUSED` | `CONNECTION_ERROR` |
 | `ENOTFOUND` | `CONNECTION_ERROR` |
 | `ETIMEDOUT` | `CONNECTION_ERROR` |
+| `ECONNRESET` | `CONNECTION_ERROR` |
+| `EPIPE` | `CONNECTION_ERROR` |
+| `EAI_AGAIN` | `CONNECTION_ERROR` |
+| Code-less `Connection terminated` message | `CONNECTION_ERROR` |
 | `40001` | `TRANSACTION_ROLLBACK_ERROR` |
 | `40P01` | `TRANSACTION_ROLLBACK_ERROR` |
 | Any other code beginning with `08` | `CONNECTION_ERROR` |
 | Every other code | `DATABASE_ERROR` |
 
-Unique, foreign-key, and not-null faults also include the inferred field in metadata when available.
+Known codes retain their specific messages. Unique, foreign-key, and not-null faults also include the inferred field in metadata when available. A standalone Drizzle `TransactionRollbackError` retains the default HTTP status `500`.

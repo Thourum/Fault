@@ -13,6 +13,18 @@ const tagForStatus = (status: number): FaultTag => {
 
 const networkFault = (error: unknown): Fault => {
     const err = error instanceof Error ? error : new Error(String(error));
+    if (err.name === 'TimeoutError') {
+        return new Fault(err)
+            .withTag('TIMEOUT_ERROR')
+            .withDescription('Network request timed out', 'The request timed out.')
+            .withCause(err);
+    }
+    if (err.name === 'AbortError') {
+        return new Fault(err)
+            .withTag('ABORTED')
+            .withDescription('Network request aborted', 'The request was aborted.')
+            .withCause(err);
+    }
     return new Fault(err)
         .withTag('NETWORK_ERROR')
         .withDescription(
@@ -23,160 +35,63 @@ const networkFault = (error: unknown): Fault => {
 };
 
 /**
- * Safely perform a fetch request, returning a ResultAsync type
+ * Fetch a response without consuming its body. Non-2xx responses become tagged
+ * Faults with status, headers and a JSON-parsed (when possible) or text body in metadata.
+ * Network failures, timeouts and aborts become distinct tagged Faults.
  *
- * Wraps the native fetch API to return a ResultAsync instead of throwing errors.
- * Handles network errors, HTTP error responses, and JSON parsing errors.
- * Categorizes errors into appropriate Fault tags for precise error handling.
- *
- * @template T - The expected type of the response data
  * @param input - URL or string to fetch
- * @param init - Optional RequestInit options (headers, method, body, etc.)
- * @returns ResultAsync<T, Fault> - Either the parsed response or a Fault error
+ * @param init - Optional RequestInit options
+ * @returns The native Response or a Fault
  *
- * @example Basic GET request
- * import { safeFetch } from '@thourum/fault/fetch'
- *
- * const result = await safeFetch<{ id: number; name: string }>('https://api.example.com/users/1')
- *
- * result.match(
- *   (user) => console.log('User:', user),
- *   (fault) => console.error('Error:', fault.message)
- * )
- *
- * @example POST with JSON body
- * const result = await safeFetch<{ id: number }>(
- *   'https://api.example.com/users',
- *   {
- *     method: 'POST',
- *     headers: { 'Content-Type': 'application/json' },
- *     body: JSON.stringify({ name: 'John', email: 'john@example.com' })
- *   }
- * )
- *
- * result.match(
- *   (newUser) => console.log('Created:', newUser.id),
- *   (fault) => {
- *     if (fault.tag === 'BAD_REQUEST') {
- *       console.error('Invalid input:', fault.details)
- *     } else if (fault.tag === 'NETWORK_ERROR') {
- *       console.error('Network issue:', fault.message)
- *     }
- *   }
- * )
- *
- * @example Chaining with Zod validation
- * import { okAsync } from '@thourum/fault'
- * import { safeZodParse } from '@thourum/fault/zod'
- * import { z } from 'zod'
- *
- * const userSchema = z.object({
- *   id: z.number(),
- *   name: z.string(),
- *   email: z.string().email()
- * })
- *
- * const fetchAndValidateUser = (userId: number) =>
- *   safeFetch<unknown>(`https://api.example.com/users/${userId}`)
- *     .andThen((data) => safeZodParse(userSchema, data).asyncAndThen((user) => okAsync(user)))
- *
- * @example Error handling with status codes
+ * @example
  * const result = await safeFetch('https://api.example.com/data')
- *
- * result.match(
- *   (data) => console.log('Success:', data),
- *   (fault) => {
- *     switch (fault.tag) {
- *       case 'BAD_REQUEST': // 4xx client errors
- *         console.error('Client error:', fault.metadata.httpStatus)
- *         break
- *       case 'NOT_FOUND': // 404 specifically
- *         console.error('Resource not found')
- *         break
- *       case 'INTERNAL_ERROR': // 5xx server errors
- *         console.error('Server error:', fault.metadata.httpStatus)
- *         break
- *       case 'NETWORK_ERROR':
- *         console.error('Network error:', fault.message)
- *         break
- *       case 'PARSE_ERROR':
- *         console.error('Invalid response:', fault.message)
- *         break
- *     }
- *   }
- * )
- *
- * @example With error capture
- * const result = await safeFetch('https://api.example.com/data')
- *
- * result.match(
- *   (data) => console.log('Success:', data),
- *   (fault) => {
- *     // Capture to OpenTelemetry or Sentry if available
- *     fault.capture()
- *     throw fault
- *   }
- * )
- *
- * @example Response metadata access
- * const result = await safeFetch<{ message: string }>('https://api.example.com/data')
- *
- * result.match(
- *   (data) => console.log(data.message),
- *   (fault) => {
- *     // Access response headers
- *     const headers = fault.metadata.httpHeaders as Record<string, string> | undefined
- *     const contentType = headers?.['content-type']
- *
- *     // Access response body
- *     const body = fault.metadata.httpBody
- *
- *     // Access status code
- *     const status = fault.metadata.httpStatus as number | undefined
- *   }
- * )
- *
- * @see safeZodParse - For validating API responses
- * @see Fault - For error handling patterns
+ * result.match((response) => response.text(), (fault) => console.error(fault.tag))
  */
-export function safeFetch<T = unknown>(
+export function safeFetch(input: URL | string, init?: RequestInit): ResultAsync<Response, Fault> {
+    return ResultAsync.fromThrowable(fetch, networkFault)(input, init).andThen((response) => {
+        if (response.ok) return okAsync(response);
+
+        return ResultAsync.fromThrowable(() => response.text(), networkFault)().andThen((text) => {
+            let httpBody: unknown = text;
+            try {
+                httpBody = JSON.parse(text);
+            } catch {
+                // Keep raw text as httpBody.
+            }
+
+            return errAsync(
+                new Fault(`HTTP ${response.status}: ${response.statusText}`)
+                    .withTag(tagForStatus(response.status))
+                    .withMetadata({
+                        httpStatus: response.status,
+                        httpStatusText: response.statusText,
+                        httpHeaders: Object.fromEntries(response.headers),
+                        httpBody,
+                    })
+            );
+        });
+    });
+}
+
+/**
+ * Fetch and parse a successful response as JSON, regardless of content type.
+ * Empty or malformed bodies become PARSE_ERROR Faults with the HTTP status in metadata.
+ * HTTP and network errors are returned by safeFetch without attempting success parsing.
+ *
+ * @template T - Expected JSON data shape
+ * @param input - URL or string to fetch
+ * @param init - Optional RequestInit options
+ * @returns Parsed JSON or a Fault
+ *
+ * @example
+ * const result = await safeFetchJSON<{ id: number }>('https://api.example.com/users/1')
+ */
+export function safeFetchJSON<T = unknown>(
     input: URL | string,
     init?: RequestInit
 ): ResultAsync<T, Fault> {
-    return ResultAsync.fromPromise(fetch(input, init), networkFault).andThen((response: Response) => {
-        if (!response.ok) {
-            return ResultAsync.fromPromise(response.text(), networkFault).andThen((text) => {
-                let httpBody: unknown = text;
-                try {
-                    httpBody = JSON.parse(text);
-                } catch {
-                    // keep raw text as httpBody
-                }
-
-                const headersObj: Record<string, string> = {};
-                response.headers.forEach((value: string, key: string) => {
-                    headersObj[key] = value;
-                });
-
-                return errAsync(
-                    new Fault(`HTTP ${response.status}: ${response.statusText}`)
-                        .withTag(tagForStatus(response.status))
-                        .withMetadata({
-                            httpStatus: response.status,
-                            httpStatusText: response.statusText,
-                            httpHeaders: headersObj,
-                            httpBody,
-                        })
-                );
-            });
-        }
-
-        return ResultAsync.fromPromise(response.text(), networkFault).andThen((text) => {
-            const mediaType = (response.headers.get('content-type') ?? '').split(';')[0]!.trim();
-            const isJson = /^application\/([\w.-]+\+)?json\b/i.test(mediaType);
-            if (response.status === 204 || !isJson || text === '') {
-                return okAsync(undefined as T);
-            }
+    return safeFetch(input, init).andThen((response) =>
+        ResultAsync.fromThrowable(() => response.text(), networkFault)().andThen((text) => {
             try {
                 return okAsync(JSON.parse(text) as T);
             } catch (error: unknown) {
@@ -189,8 +104,9 @@ export function safeFetch<T = unknown>(
                             'The server returned an invalid response. Please try again.'
                         )
                         .withCause(err)
+                        .withMetadata({ httpStatus: response.status })
                 );
             }
-        });
-    });
+        })
+    );
 }

@@ -9,8 +9,8 @@ describe('safeZodParse', () => {
     const r = safeZodParse(user)({ name: 'a', age: 20 })
     expect(r._unsafeUnwrap()).toEqual({ name: 'a', age: 20 })
   })
-  it('direct form returns Ok on valid data', () => {
-    expect(safeZodParse(user, { name: 'a', age: 20 }).isOk()).toBe(true)
+  it('direct form parses an explicit undefined instead of currying', () => {
+    expect(safeZodParse(z.string().optional(), undefined).isOk()).toBe(true)
   })
   it('returns VALIDATION_ERROR Fault with issues on invalid data', () => {
     const f = safeZodParse(user, { name: 1, age: 5 })._unsafeUnwrapErr()

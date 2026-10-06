@@ -10,8 +10,8 @@ description: "@thourum/fault/zod converts Zod validation failures into typed Res
 ## safeZodParse
 
 ```ts
-safeZodParse<S extends ZodSchema>(schema: S): (data: unknown) => Result<z.infer<S>, Fault>
-safeZodParse<S extends ZodSchema>(schema: S, data: unknown): Result<z.infer<S>, Fault>
+safeZodParse<S extends z.ZodType>(schema: S): (data: unknown) => Result<z.infer<S>, Fault>
+safeZodParse<S extends z.ZodType>(schema: S, data: unknown): Result<z.infer<S>, Fault>
 ```
 
 ```ts
@@ -20,25 +20,25 @@ const parseUser = safeZodParse(userSchema)
 const parsedLater = parseUser(input)
 ```
 
-Use the direct form for one defined value or the curried form when the same schema validates multiple values; validation failures are converted with `fromZodError`. Passing `data === undefined` selects the curried form and returns a parser, not a `Result`.
+Use the direct form for one value or the curried form when the same schema validates multiple values; validation failures are converted with `fromZodError`. `safeZodParse(schema, undefined)` parses `undefined`; only omitting the second argument returns a parser.
 
 **Tag produced:** `VALIDATION_ERROR`.
 
 ```ts
-safeFetch<unknown>('/api/user')
+safeFetchJSON<unknown>('/api/user')
   .andThen((data) => safeZodParse(userSchema, data))
   .match(showUser, showFault)
 ```
 
 ## fromZodError
 
-`fromZodError(error: ZodError): Fault`
+`fromZodError(error: z.ZodError): Fault`
 
 ```ts
 const result = userSchema.safeParse(input)
 const fault = result.success ? undefined : fromZodError(result.error)
 ```
 
-The fault message uses the first issue, `details` remains unset, its cause is the original `ZodError`, and metadata contains `zodIssues`, `issueCount`, and flattened `fieldErrors`.
+The fault message uses the first issue, `details` remains unset, its cause is the original `ZodError`, and metadata contains `zodIssues`, `issueCount`, and `fieldErrors` from Zod 4's `z.flattenError(error)`.
 
 **Tag produced:** `VALIDATION_ERROR`.

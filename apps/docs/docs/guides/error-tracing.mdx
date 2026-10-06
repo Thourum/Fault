@@ -31,17 +31,14 @@ Fault.onCapture = (fault) => {
 
 ## Capture once at the edge
 
-Call `.capture()` once where the result leaves the request, job, or command boundary. `orInspect` observes the error without changing the result, so it keeps capture out of lower-level helpers.
+Call `.capture()` once where the result leaves the request, job, or command boundary. Use `mapErr` to attach context to the result's new fault, then `orInspect` to capture without changing the result.
 
 Add request context before capture. Hash identifiers or omit them when the raw value is sensitive.
 
 ```ts
 return runOperation()
-  .orInspect((fault) =>
-    fault
-      .withMetadata({ userId: hash(userId), requestId })
-      .capture(),
-  )
+  .mapErr((fault) => fault.withMetadata({ userId: hash(userId), requestId }))
+  .orInspect((fault) => fault.capture())
 ```
 
 Do not capture the same fault in each helper and again at the edge. Lower layers can add a cause, tag, details, or metadata and return it for one final capture.
@@ -67,7 +64,7 @@ export function chargeUser(userId: string, amountCents: number) {
         : ok(user),
     )
     .andThen((user) =>
-      safeFetch('https://api.stripe.com/v1/payment_intents', {
+      safeFetchJSON('https://api.stripe.com/v1/payment_intents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${stripeKey}` },
         body: new URLSearchParams({
@@ -95,19 +92,16 @@ export function chargeUser(userId: string, amountCents: number) {
         amountCents,
       }),
     )
-    .orInspect((fault) =>
-      fault
-        .withMetadata({ userId: hash(userId), amountCents })
-        .capture(),
-    )
+    .mapErr((fault) => fault.withMetadata({ userId: hash(userId), amountCents }))
+    .orInspect((fault) => fault.capture())
 }
 ```
 
 1. `safeDb` converts database failures to faults, while `retry` only repeats connection failures.
 2. `ServiceError` represents expected missing-user and already-paid states in the same result pipeline.
-3. `safeFetch` and `safeZodParse` cover the external response and its payload before business checks run.
+3. `safeFetchJSON` and `safeZodParse` cover the external response and its payload before business checks run.
 4. The failed intent adds its provider identifier; the success branch logs a hashed user identifier.
-5. The final `orInspect` adds request metadata and calls `.capture()` once for every failed path.
+5. The final `mapErr` adds request metadata; `orInspect` calls `.capture()` once for every failed path.
 
 ## Post creation flow
 
@@ -140,9 +134,8 @@ export function createPost(authorId: string, raw: unknown) {
         },
       ),
     )
-    .orInspect((fault) =>
-      fault.withMetadata({ authorId: hash(authorId) }).capture(),
-    )
+    .mapErr((fault) => fault.withMetadata({ authorId: hash(authorId) }))
+    .orInspect((fault) => fault.capture())
 }
 ```
 

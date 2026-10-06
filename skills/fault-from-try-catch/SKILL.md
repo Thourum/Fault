@@ -58,14 +58,14 @@ const loadUser = fromAsyncThrowable(
 
 | Import | Use instead of |
 |---|---|
-| `@thourum/fault/fetch` `safeFetch(url, init?)` | `fetch` + try/catch |
+| `@thourum/fault/fetch` `safeFetch(url, init?)` / `safeFetchJSON<T>(url, init?)` | `fetch` + try/catch (native Response / parsed JSON) |
 | `@thourum/fault/zod` `safeZodParse(schema, data)` / `safeZodParse(schema)` | `schema.parse` |
-| `@thourum/fault/drizzle` `safeDb(promise)`, `DatabaseError(cause)` | drizzle try/catch |
-| `@thourum/fault/pg` `parsePgError(pgError)` | raw `pg` error mapping |
+| `@thourum/fault/drizzle` `safeDb(promise)`, `DatabaseError(cause)` | drizzle try/catch; driver message, query/params metadata, outer cause |
+| `@thourum/fault/pg` `parsePgError(pgError)` | raw `pg` error mapping; known codes get specific messages, unknown errors keep driver message |
 | `@thourum/fault/std` `safeJsonParse`, `safeReadFile`, `safeEnv` | `JSON.parse`, `fs`, `process.env` |
 
 ```ts
-import { safeFetch } from '@thourum/fault/fetch'
+import { safeFetchJSON } from '@thourum/fault/fetch'
 import { safeZodParse } from '@thourum/fault/zod'
 import { safeDb } from '@thourum/fault/drizzle'
 import { safeJsonParse, safeReadFile, safeEnv } from '@thourum/fault/std'
@@ -74,7 +74,7 @@ safeEnv('API_TOKEN')
 safeJsonParse<unknown>(text)
 safeReadFile(path)
 safeDb(db.query.users.findFirst({ where: eq(users.id, id) }))
-safeFetch<unknown>('/api/user').andThen((data) => safeZodParse(userSchema, data))
+safeFetchJSON<unknown>('/api/user').andThen((data) => safeZodParse(userSchema, data))
 ```
 
 ## Replace catch sites
@@ -143,12 +143,12 @@ import { Fault } from '@thourum/fault'
 
 Fault.onCapture = (f) => Sentry.captureException(f, { extra: f.toJSON() })
 
-return runOperation().orInspect((fault) =>
-  fault.withMetadata({ requestId }).capture(),
-)
+return runOperation()
+  .mapErr((fault) => fault.withMetadata({ requestId }))
+  .orInspect((fault) => fault.capture())
 ```
 
-Do not call `capture()` in helpers. Lower layers add tag / details / metadata / cause and return; the edge captures once.
+Do not call `capture()` in helpers. Lower layers return new faults with tag / details / metadata / cause; the edge captures once.
 
 ## Do not
 

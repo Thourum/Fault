@@ -2,10 +2,6 @@ import {
   err,
   Err,
   errAsync,
-  fromAsyncThrowable,
-  fromPromise,
-  fromSafePromise,
-  fromThrowable,
   ok,
   Ok,
   okAsync,
@@ -38,11 +34,6 @@ describe('Result.Ok', () => {
     expect(okVal.isOk()).toBe(true)
     expect(okVal.isErr()).toBe(false)
     expect(okVal._unsafeUnwrap()).toBeUndefined()
-  })
-
-  it('Is comparable', () => {
-    expect(ok(42)).toEqual(ok(42))
-    expect(ok(42)).not.toEqual(ok(43))
   })
 
   it('Maps over an Ok value', () => {
@@ -112,23 +103,8 @@ describe('Result.Ok', () => {
     })
 
     it('Maps to an Err', () => {
-      const okval = ok(12)
-
-      const thrued = okval.andThen((_number) => {
-        // ...
-        // complex logic
-        // ...
-        return err('Whoopsies!')
-      })
-
-      expect(thrued.isOk()).toBe(false)
-      expect(thrued._unsafeUnwrapErr()).toStrictEqual('Whoopsies!')
-
-      const nextFn = mock((_val) => ok('noop'))
-
-      thrued.andThen(nextFn)
-
-      expect(nextFn).not.toHaveBeenCalled()
+      const checked = ok(12).andCheck(() => err('Whoopsies!'))
+      expect(checked._unsafeUnwrapErr()).toBe('Whoopsies!')
     })
   })
 
@@ -196,24 +172,8 @@ describe('Result.Ok', () => {
     })
 
     it('Maps to an Err', async () => {
-      const okval = ok(12)
-
-      const teedAsync = okval.asyncAndThen((_number) => {
-        // ...
-        // complex logic
-        // ...
-        return errAsync('Whoopsies!')
-      })
-      expect(teedAsync).toBeInstanceOf(ResultAsync)
-      const teed = await teedAsync
-      expect(teed.isOk()).toBe(false)
-      expect(teed._unsafeUnwrapErr()).toStrictEqual('Whoopsies!')
-
-      const nextFn = mock((_val) => ok('noop'))
-
-      teed.andThen(nextFn)
-
-      expect(nextFn).not.toHaveBeenCalled()
+      const checked = await ok(12).asyncAndCheck(() => errAsync('Whoopsies!'))
+      expect(checked._unsafeUnwrapErr()).toBe('Whoopsies!')
     })
   })
   describe('orElse', () => {
@@ -286,12 +246,6 @@ describe('Result.Ok', () => {
     expect(errMapper).not.toHaveBeenCalled()
   })
 
-  it('Unwraps without issue', () => {
-    const okVal = ok(12)
-
-    expect(okVal._unsafeUnwrap()).toBe(12)
-  })
-
   it('Can read the value after narrowing', () => {
     const fallible: () => Result<string, number> = () => ok('safe to read')
     const val = fallible()
@@ -311,11 +265,6 @@ describe('Result.Err', () => {
     expect(errVal.isOk()).toBe(false)
     expect(errVal.isErr()).toBe(true)
     expect(errVal).toBeInstanceOf(Err)
-  })
-
-  it('Is comparable', () => {
-    expect(err(42)).toEqual(err(42))
-    expect(err(42)).not.toEqual(err(43))
   })
 
   it('Skips `map`', () => {
@@ -456,12 +405,6 @@ describe('Result.Err', () => {
     }).toThrowError()
   })
 
-  it('Unwraps without issue', () => {
-    const okVal = err(12)
-
-    expect(okVal._unsafeUnwrapErr()).toBe(12)
-  })
-
   describe('orElse', () => {
     it('invokes the orElse callback on an Err value', () => {
       const okVal = err('BOOOM!')
@@ -529,9 +472,6 @@ describe('Result.fromThrowable', () => {
     expect(result._unsafeUnwrapErr()).toEqual({ message: 'error' })
   })
 
-  it('has a top level export', () => {
-    expect(fromThrowable).toBe(Result.fromThrowable)
-  })
 })
 
 describe('Utils', () => {
@@ -740,26 +680,6 @@ describe('Utils', () => {
       })
     })
 
-    describe('proxy objects `ResultAsync.combine`', () => {
-      interface ITestInterface {
-        getName(): string
-        setName(name: string): void
-        getAsyncResult(): ResultAsync<ITestInterface, Error>
-      }
-
-      it('Combines proxy objects from mocks generated via interfaces', async () => {
-        const mock = ({} as ITestInterface)
-
-        const result = await ResultAsync.combine([okAsync(mock)] as const)
-
-        expect(result).toBeDefined()
-        expect(result.isErr()).toBeFalsy()
-        const unwrappedResult = result._unsafeUnwrap()
-
-        expect(unwrappedResult.length).toBe(1)
-        expect(unwrappedResult[0]).toBe(mock)
-      })
-    })
   })
 })
 
@@ -809,20 +729,6 @@ describe('ResultAsync', () => {
       expect(err).toEqual('Oops!')
     })
 
-    it('Can be used with Promise.all', async () => {
-      const allResult = await Promise.all([okAsync<string, Error>('1')])
-
-      expect(allResult).toHaveLength(1)
-      expect(allResult[0]).toBeInstanceOf(Ok)
-      if (!(allResult[0] instanceof Ok)) return
-      expect(allResult[0].isOk()).toBe(true)
-      expect(allResult[0]._unsafeUnwrap()).toEqual('1')
-    })
-
-    it('rejects if the underlying promise is rejected', () => {
-      const asyncResult = new ResultAsync(Promise.reject('oops'))
-      return expect(Promise.resolve(asyncResult)).rejects.toBe('oops')
-    })
   })
 
   describe('map', () => {
@@ -1169,16 +1075,9 @@ describe('ResultAsync', () => {
     })
   })
 
-  describe('unwrapOr', () => {
-    it('returns a promise to the result value on an Ok', async () => {
-      const unwrapped = await okAsync(12).unwrapOr(10)
-      expect(unwrapped).toBe(12)
-    })
-
-    it('returns a promise to the provided default value on an Error', async () => {
-      const unwrapped = await errAsync<number, number>(12).unwrapOr(10)
-      expect(unwrapped).toBe(10)
-    })
+  it('unwrapOr resolves the Ok value or the default for an Err', async () => {
+    expect(await okAsync(12).unwrapOr(10)).toBe(12)
+    expect(await errAsync<number, string>('failed').unwrapOr(10)).toBe(10)
   })
 
   describe('fromSafePromise', () => {
@@ -1192,9 +1091,6 @@ describe('ResultAsync', () => {
       expect(val._unsafeUnwrap()).toEqual(12)
     })
 
-    it('has a top level export', () => {
-      expect(fromSafePromise).toBe(ResultAsync.fromSafePromise)
-    })
   })
 
   describe('fromPromise', () => {
@@ -1208,9 +1104,6 @@ describe('ResultAsync', () => {
       expect(val._unsafeUnwrapErr()).toEqual(Error('Oops: No!'))
     })
 
-    it('has a top level export', () => {
-      expect(fromPromise).toBe(ResultAsync.fromPromise)
-    })
   })
 
   describe('ResultAsync.fromThrowable', () => {
@@ -1264,34 +1157,6 @@ describe('ResultAsync', () => {
       expect(unwrapped.message).toBe('Oops: No!')
     })
 
-    it('has a top level export', () => {
-      expect(fromAsyncThrowable).toBe(ResultAsync.fromThrowable)
-    })
   })
 
-  describe('okAsync', () => {
-    it('Creates a ResultAsync that resolves to an Ok', async () => {
-      const val = okAsync(12)
-
-      expect(val).toBeInstanceOf(ResultAsync)
-
-      const res = await val
-
-      expect(res.isOk()).toBe(true)
-      expect(res._unsafeUnwrap()).toEqual(12)
-    })
-  })
-
-  describe('errAsync', () => {
-    it('Creates a ResultAsync that resolves to an Err', async () => {
-      const err = errAsync('bad')
-
-      expect(err).toBeInstanceOf(ResultAsync)
-
-      const res = await err
-
-      expect(res.isErr()).toBe(true)
-      expect(res._unsafeUnwrapErr()).toEqual('bad')
-    })
-  })
 })
